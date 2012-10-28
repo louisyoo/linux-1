@@ -750,4 +750,10 @@ config TOUCHSCREEN_DMC_FIT_10_DEBUG
        help
 	 Say Y here if you want to view some debug messages from driver.
 
+config  TOUCHSCREEN_GT811
+       tristate  "dpt microelctronics gt811 touchscreen driver"
+       depends on I2C
+       help
+          GT811 touchscreen driver
+
 endif
