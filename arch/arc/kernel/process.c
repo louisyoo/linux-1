@@ -218,6 +218,7 @@ unsigned long thread_saved_pc(struct task_struct *t)
 
 int elf_check_arch(const struct elf32_hdr *x)
 {
+#if 0
 	unsigned int eflags;
 
 	if (x->e_machine != EM_ARCOMPACT)
@@ -229,7 +230,7 @@ int elf_check_arch(const struct elf32_hdr *x)
 		force_sigsegv(SIGSEGV, current);
 		return 0;
 	}
-
+#endif
 	return 1;
 }
 EXPORT_SYMBOL(elf_check_arch);
