@@ -54,6 +54,7 @@
 #include <linux/syscalls.h>
 #include <linux/tracehook.h>
 #include <asm/ucontext.h>
+#include <asm/event-log.h>
 
 #define _BLOCKABLE (~(sigmask(SIGKILL) | sigmask(SIGSTOP)))
 
@@ -131,6 +132,8 @@ SYSCALL_DEFINE0(rt_sigreturn)
 	if (unlikely(is_do_ss_needed(magic)))
 		if (restore_altstack(&sf->uc.uc_stack))
 			goto badframe;
+
+	take_snap(SNAP_SIGRETURN, 0, 0);
 
 	/* Don't restart from sigreturn */
 	syscall_wont_restart(regs);
