@@ -13,11 +13,10 @@
 
 /*
  * Signal context structure - contains all info to do with the state
- * before the signal handler was invoked.  Note: only add new entries
- * to the end of the structure.
+ * before the signal handler was invoked.
  */
 struct sigcontext {
-	struct pt_regs regs;
+	struct user_regs_struct regs;
 };
 
 #endif /* _ASM_ARC_SIGCONTEXT_H */

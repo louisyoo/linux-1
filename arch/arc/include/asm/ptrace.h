@@ -12,7 +12,6 @@
 
 #include <uapi/asm/ptrace.h>
 
-
 #ifndef __ASSEMBLY__
 
 /* THE pt_regs: Defines how regs are saved during entry into kernel */
@@ -50,13 +49,17 @@ struct pt_regs {
 	long r0;
 	long sp;	/* user/kernel sp depending on where we came from  */
 	long orig_r0;
+
 	/*to distinguish bet excp, syscall, irq */
+	union {
 #ifdef CONFIG_CPU_BIG_ENDIAN
-	/* so that assembly code is same for LE/BE */
-	unsigned long orig_r8:16, event:16;
+		/* so that assembly code is same for LE/BE */
+		unsigned long orig_r8:16, event:16;
 #else
-	unsigned long event:16, orig_r8:16;
+		unsigned long event:16, orig_r8:16;
 #endif
+		long orig_r8_word;
+	};
 };
 
 /* Callee saved registers - need to be saved only when you are scheduled out */
@@ -76,14 +79,6 @@ struct callee_regs {
 	long r15;
 	long r14;
 	long r13;
-};
-
-/* User mode registers, used for core dumps. */
-struct user_regs_struct {
-	struct pt_regs scratch;
-	struct callee_regs callee;
-	long efa;	/* break pt addr, for break points in delay slots */
-	long stop_pc;	/* give dbg stop_pc directly after checking orig_r8 */
 };
 
 #define instruction_pointer(regs)	((regs)->ret)
