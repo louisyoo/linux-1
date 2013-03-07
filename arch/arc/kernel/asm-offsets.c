@@ -9,11 +9,11 @@
 #include <linux/sched.h>
 #include <linux/mm.h>
 #include <linux/interrupt.h>
-#include <linux/thread_info.h>
-#include <linux/kbuild.h>
 #include <asm/hardirq.h>
+#include <linux/thread_info.h>
 #include <asm/page.h>
-#include <asm/ptrace.h>
+#include <linux/kbuild.h>
+#include <asm/event-log.h>
 
 int main(void)
 {
@@ -45,20 +45,6 @@ int main(void)
 	DEFINE(MM_PGD, offsetof(struct mm_struct, pgd));
 
 	DEFINE(MM_CTXT_ASID, offsetof(mm_context_t, asid));
-
-	BLANK();
-
-	DEFINE(PT_status32, offsetof(struct pt_regs, status32));
-	DEFINE(PT_orig_r8, offsetof(struct pt_regs, orig_r8_word));
-	DEFINE(PT_sp, offsetof(struct pt_regs, sp));
-	DEFINE(PT_r0, offsetof(struct pt_regs, r0));
-	DEFINE(PT_r1, offsetof(struct pt_regs, r1));
-	DEFINE(PT_r2, offsetof(struct pt_regs, r2));
-	DEFINE(PT_r3, offsetof(struct pt_regs, r3));
-	DEFINE(PT_r4, offsetof(struct pt_regs, r4));
-	DEFINE(PT_r5, offsetof(struct pt_regs, r5));
-	DEFINE(PT_r6, offsetof(struct pt_regs, r6));
-	DEFINE(PT_r7, offsetof(struct pt_regs, r7));
 
 #ifdef CONFIG_ARC_DBG_EVENT_TIMELINE
 	BLANK();
