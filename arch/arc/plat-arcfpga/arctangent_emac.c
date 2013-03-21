@@ -118,32 +118,27 @@ volatile unsigned int skb_count = 0;
 #define	VMAC_BUFFER_PAD 36
 
 /* VMAC register definitions */
-typedef volatile struct {
-	unsigned int id, status, enable, ctrl, pollrate, rxerr, miss,
-	    tx_ring, rx_ring, addrl, addrh, lafl, lafh, mdio;
-} arc_emac_reg;
+#define R_ID		0
+#define R_STATUS	1
+#define R_ENABLE	2
+#define R_CTRL		3
+#define R_POLLRATE	4
+#define R_RXERR		5
+#define R_MISS		6
+#define R_TX_RING	7
+#define R_RX_RING	8
+#define R_ADDRL		9
+#define R_ADDRH		10
+#define R_LAFL		11
+#define R_LAFH		12
+#define R_MDIO		13
 
-#define ASSUME_1_EMAC
+#define EMAC_R(emac, reg)		(emac->reg_base_addr + reg)
+#define EMAC_REG_SET(emac, reg, val)	writel((val), EMAC_R(emac, reg))
+#define EMAC_REG_GET(emac, reg)		readl(EMAC_R(emac, reg))
 
-#ifdef ASSUME_1_EMAC
-
-#ifdef ARC_SIMPLE_REG_ACCESS
-
-#define EMAC_REG(ap)   ((arc_emac_reg *)(VMAC_REG_BASEADDR))
-
-#else /* ! ARC_SIMPLE_REG_ACCESS */
-
-static inline arc_emac_reg *const EMAC_REG(void *ap)
-{
-	arc_emac_reg *p = (arc_emac_reg *) VMAC_REG_BASEADDR;
-asm("; fix %0":"+r"(p));
-	return p;
-}
-#endif
-
-#else /* ! ASSUME_1_EMAC */
-#define EMAC_REG(ap)   (ap->reg_base_addr)
-#endif
+#define EMAC_REG_OR(e, r, v)  EMAC_REG_SET(e, r, EMAC_REG_GET(e, r) | (v))
+#define EMAC_REG_CLR(e, r, v) EMAC_REG_SET(e, r, EMAC_REG_GET(e, r) & ~(v))
 
 /* STATUS and ENABLE Register bit masks */
 #define TXINT_MASK	(1<<0)	/* Transmit interrupt */
@@ -225,22 +220,6 @@ asm("; fix %0":"+r"(p));
 #define LXT971A_STATUS2_LINK_UP     0x400
 #define LXT971A_STATUS2_100         0x4000
 
-#define __mdio_write(priv, phy_reg, val)	\
-{                                                   \
-    priv->mdio_complete = 0;				\
-	EMAC_REG(priv)->mdio = (0x50020000 | (PHY_ID << 23) | \
-					          (phy_reg << 18) | (val & 0xffff)) ; \
-	while (!priv->mdio_complete);			\
-}
-
-#define __mdio_read(priv, phy_reg, val)	\
-{                                                   \
-    priv->mdio_complete = 0;				\
-	EMAC_REG(priv)->mdio = (0x60020000 | (PHY_ID << 23) | (phy_reg << 18));	\
-	while (!priv->mdio_complete);			\
-	val = EMAC_REG(priv)->mdio; \
-	val &= 0xffff;              \
-}
 
 typedef struct {
 	unsigned int info;
@@ -256,7 +235,7 @@ typedef struct {
 struct arc_emac_priv {
 	struct net_device_stats stats;
 	/* base address of the register set for this device */
-	arc_emac_reg *reg_base_addr;
+	unsigned long *reg_base_addr;
 	spinlock_t lock;
 
 	/* pointers to BD Rings - CPU side */
@@ -300,6 +279,27 @@ static int arc_emac_clean(struct net_device *dev
 			  , unsigned int work_to_do
 #endif
     );
+
+static void
+__mdio_write(struct arc_emac_priv *ap, unsigned int phy_reg, unsigned int val)
+{
+	ap->mdio_complete = 0;
+	EMAC_REG_SET(ap, R_MDIO,
+		(0x50020000 | (PHY_ID << 23) | (phy_reg << 18) | (val & 0xffff)));
+	while (!ap->mdio_complete);
+}
+
+static void
+__mdio_read(struct arc_emac_priv *ap, unsigned int phy_reg, unsigned int *val)
+{
+	ap->mdio_complete = 0;
+	EMAC_REG_SET(ap, R_MDIO,
+		(0x60020000 | (PHY_ID << 23) | (phy_reg << 18)));
+	while (!ap->mdio_complete);
+
+	*val = EMAC_REG_GET(ap, R_MDIO);
+	*val &= 0xffff;
+}
 
 static void dump_phy_status(unsigned int status)
 {
@@ -349,7 +349,7 @@ static int arc_emac_poll(struct napi_struct *napi, int budget)
 
 	if (work_done < budget) {
 		napi_complete(napi);
-		EMAC_REG(ap)->enable |= RXINT_MASK;
+		EMAC_REG_OR(ap, R_ENABLE, RXINT_MASK);
 	}
 
 	/*    printk("work done %u budget %u\n", work_done, budget); */
@@ -476,16 +476,16 @@ static irqreturn_t arc_emac_intr(int irq, void *dev_instance)
 	struct arc_emac_priv *ap = netdev_priv(dev);
 	unsigned int status, enable;
 
-	status = EMAC_REG(ap)->status;
-	EMAC_REG(ap)->status = status;
-	enable = EMAC_REG(ap)->enable;
+	status = EMAC_REG_GET(ap, R_STATUS);
+	EMAC_REG_SET(ap, R_STATUS, status);
+	enable = EMAC_REG_GET(ap, R_ENABLE);
 
 	if (likely(status & (RXINT_MASK | TXINT_MASK))) {
 		if (status & RXINT_MASK) {
 
 #ifdef CONFIG_EMAC_NAPI
 			if (likely(napi_schedule_prep(&ap->napi))) {
-				EMAC_REG(ap)->enable &= ~RXINT_MASK;	/* no more interrupts. */
+				EMAC_REG_CLR(ap, R_ENABLE, RXINT_MASK);	/* no more interrupts. */
 				__napi_schedule(&ap->napi);
 			}
 #else
@@ -606,7 +606,7 @@ int arc_emac_open(struct net_device *dev)
 		dev_err(&dev->dev, "EMAC request_irq failed\n");
 		return i;
 	}
-	EMAC_REG(ap)->enable |= MDIO_MASK;	/* MDIO Complete Interrupt Mask */
+	EMAC_REG_OR(ap, R_ENABLE, MDIO_MASK);	/* MDIO Complete Interrupt Mask */
 
 	/* Reset the PHY */
 	__mdio_write(ap, LXT971A_CTRL_REG, LXT971A_CTRL_RESET);
@@ -614,7 +614,7 @@ int arc_emac_open(struct net_device *dev)
 	/* Wait till the PHY has finished resetting */
 	i = 0;
 	do {
-		__mdio_read(ap, LXT971A_CTRL_REG, temp);
+		__mdio_read(ap, LXT971A_CTRL_REG, &temp);
 		i++;
 	} while (i < AUTO_NEG_TIMEOUT && (temp & LXT971A_CTRL_RESET));
 
@@ -645,7 +645,7 @@ int arc_emac_open(struct net_device *dev)
 		/* Wait for Auto Negotiation to complete */
 		i = 0;
 		do {
-			__mdio_read(ap, LXT971A_STATUS2_REG, temp);
+			__mdio_read(ap, LXT971A_STATUS2_REG, &temp);
 			i++;
 		} while ((i < AUTO_NEG_TIMEOUT)
 			 && !(temp & LXT971A_STATUS2_COMPLETE));
@@ -672,7 +672,7 @@ int arc_emac_open(struct net_device *dev)
 		__mdio_write(ap, LXT971A_CTRL_REG, 0);
 		duplex = 0;
 	}
-	__mdio_read(ap, LXT971A_STATUS2_REG, temp);
+	__mdio_read(ap, LXT971A_STATUS2_REG, &temp);
 	dump_phy_status(temp);
 
 	printk("EMAC MTU %d\n", dev->mtu);
@@ -703,40 +703,40 @@ int arc_emac_open(struct net_device *dev)
 		bd++;
 	}
 	/* Initialize logical address filter */
-	EMAC_REG(ap)->lafl = 0x0;
-	EMAC_REG(ap)->lafh = 0x0;
+	EMAC_REG_SET(ap, R_LAFL, 0x0);
+	EMAC_REG_SET(ap, R_LAFH, 0x0);
 
 	/* Set BD ring pointers for device side */
 #ifdef ARC_EMAC_COH_MEM
-	EMAC_REG(ap)->rx_ring = (unsigned int)ap->rxbd_dma_hdl;
-	EMAC_REG(ap)->tx_ring = (unsigned int)ap->rxbd_dma_hdl + RX_RING_SZ;
+	EMAC_REG_SET(ap, R_RX_RING, (unsigned int)ap->rxbd_dma_hdl);
+	EMAC_REG_SET(ap, R_TX_RING, (unsigned int)ap->rxbd_dma_hdl + RX_RING_SZ);
 #else
-	EMAC_REG(ap)->rx_ring = (unsigned int)ap->rxbd;
-	EMAC_REG(ap)->tx_ring = (unsigned int)ap->txbd;
+	EMAC_REG_SET(ap, R_RX_RING, (unsigned int)ap->rxbd);
+	EMAC_REG_SET(ap, R_TX_RING, (unsigned int)ap->txbd);
 #endif
 
 	/* Set Poll rate so that it polls every 1 ms */
-	EMAC_REG(ap)->pollrate = (clk_speed / 1000000);
+	EMAC_REG_SET(ap, R_POLLRATE, (clk_speed / 1000000));
 
 	/*
 	 * Enable interrupts. Note: interrupts wont actually come till we set
 	 * CONTROL below.
 	 */
 	/* FIXME :: enable all intrs later */
-	EMAC_REG(ap)->enable = TXINT_MASK |	/* Transmit interrupt */
+	EMAC_REG_SET(ap, R_ENABLE, TXINT_MASK |	/* Transmit interrupt */
 	    RXINT_MASK |	/* Recieve interrupt */
 	    ERR_MASK |		/* Error interrupt */
 	    TXCH_MASK |		/* Transmit chaining error interrupt */
-	    MSER_MASK | MDIO_MASK;	/* MDIO Complete Intereupt Mask */
+	    MSER_MASK | MDIO_MASK);	/* MDIO Complete Intereupt Mask */
 
 	/* Set CONTROL */
-	EMAC_REG(ap)->ctrl = (RX_BD_NUM << 24) |	/* RX buffer desc table len */
+	EMAC_REG_SET(ap, R_CTRL, (RX_BD_NUM << 24) |	/* RX buffer desc table len */
 	    (TX_BD_NUM << 16) |	/* TX buffer des tabel len */
 	    TXRN_MASK |		/* TX enable */
 	    RXRN_MASK |		/* RX enable */
-	    duplex;		/* Full Duplex enable */
+	    duplex);		/* Full Duplex enable */
 
-	EMAC_REG(ap)->ctrl |= EN_MASK;	/* VMAC enable */
+	EMAC_REG_OR(ap, R_CTRL, EN_MASK);	/* VMAC enable */
 
 #ifdef CONFIG_EMAC_NAPI
 	netif_wake_queue(dev);
@@ -763,7 +763,7 @@ int arc_emac_stop(struct net_device *dev)
 #endif
 
 	/* Disable VMAC */
-	EMAC_REG(ap)->ctrl &= (~EN_MASK);
+	EMAC_REG_CLR(ap, R_CTRL, EN_MASK);
 
 	netif_stop_queue(dev);	/* stop the queue for this device */
 
@@ -799,8 +799,8 @@ void arc_emac_update_stats(struct arc_emac_priv *ap)
 {
 	unsigned long miss, rxerr, rxfram, rxcrc, rxoflow;
 
-	rxerr = EMAC_REG(ap)->rxerr;
-	miss = EMAC_REG(ap)->miss;
+	rxerr = EMAC_REG_GET(ap, R_RXERR);
+	miss = EMAC_REG_GET(ap, R_MISS);
 
 	rxcrc = (rxerr & 0xff);
 	rxfram = (rxerr >> 8 & 0xff);
@@ -857,7 +857,7 @@ tx_next_chunk:
 				       FOR_EMAC | bitmask | LAST_MASK | len);
 
 			/* Set TXPOLL bit to force a poll */
-			EMAC_REG(ap)->status |= TXPL_MASK;
+			EMAC_REG_OR(ap, R_STATUS, TXPL_MASK);
 
 			ap->txbd_curr = (ap->txbd_curr + 1) % TX_BD_NUM;
 			return 0;
@@ -908,8 +908,8 @@ int arc_emac_set_address(struct net_device *dev, void *p)
 
 	memcpy(dev->dev_addr, addr->sa_data, dev->addr_len);
 
-	EMAC_REG(ap)->addrl = *(unsigned int *)dev->dev_addr;
-	EMAC_REG(ap)->addrh = (*(unsigned int *)&dev->dev_addr[4]) & 0x0000ffff;
+	EMAC_REG_SET(ap, R_ADDRL, *(unsigned int *)dev->dev_addr);
+	EMAC_REG_SET(ap, R_ADDRH, (*(unsigned int *)&dev->dev_addr[4]) & 0x0000ffff);
 
 	return 0;
 }
@@ -928,23 +928,8 @@ static int arc_emac_probe(struct platform_device *pdev)
 {
 	struct net_device *dev;
 	struct arc_emac_priv *priv;
-	int err = -ENODEV;
-	arc_emac_reg *reg;
+	int err;
 	unsigned int id;
-
-	/* Probe for all the vmac's */
-
-	/* Calculate the register base address of this instance (num) */
-	reg = (arc_emac_reg *) (VMAC_REG_BASEADDR);
-	id = reg->id;
-
-	/* Check for VMAC revision 5 or 7, magic number */
-	if (!(id == 0x0005fd02 || id == 0x0007fd02)) {
-		printk_init("***ARC EMAC [NOT] detected, skipping EMAC init\n");
-		return -ENODEV;
-	}
-
-	printk_init("ARCTangent EMAC detected\n");
 
 	/*
 	 * Allocate a net device structure and the priv structure and
@@ -958,7 +943,18 @@ static int arc_emac_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, dev);
 
 	priv = netdev_priv(dev);
-	priv->reg_base_addr = reg;
+	priv->reg_base_addr = (unsigned long *)VMAC_REG_BASEADDR;
+
+	id = EMAC_REG_GET(priv, R_ID);
+
+	/* Check for VMAC revision 5 or 7, magic number */
+	if (!(id == 0x0005fd02 || id == 0x0007fd02)) {
+		printk_init("***ARC EMAC [NOT] detected, skipping EMAC init %x\n", id);
+		err = -ENODEV;
+		goto cleanup;
+	}
+
+	printk_init("ARCTangent EMAC detected [%x]\n", id);
 
 #ifdef ARC_EMAC_COH_MEM
 	/* alloc cache coheret memory for BD Rings - to avoid need to do
@@ -1016,6 +1012,7 @@ static int arc_emac_probe(struct platform_device *pdev)
 
 	err = register_netdev(dev);
 
+cleanup:
 	if (err) {
 		free_netdev(dev);
 	}
