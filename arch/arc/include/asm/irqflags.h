@@ -37,7 +37,7 @@ static inline long arch_local_irq_save(void)
 	"	flag.nz %0		\n"
 	: "=r"(temp), "=r"(flags)
 	: "n"((STATUS_E1_MASK | STATUS_E2_MASK))
-	: "cc");
+	: "memory", "cc");
 
 	return flags;
 }
@@ -51,7 +51,8 @@ static inline void arch_local_irq_restore(unsigned long flags)
 	__asm__ __volatile__(
 	"	flag %0			\n"
 	:
-	: "r"(flags));
+	: "r"(flags)
+	: "memory");
 }
 
 /*
@@ -71,7 +72,8 @@ static inline void arch_local_irq_disable(void)
 	"	and %0, %0, %1		\n"
 	"	flag %0			\n"
 	: "=&r"(temp)
-	: "n"(~(STATUS_E1_MASK | STATUS_E2_MASK)));
+	: "n"(~(STATUS_E1_MASK | STATUS_E2_MASK))
+	: "memory");
 }
 
 /*
@@ -83,7 +85,9 @@ static inline long arch_local_save_flags(void)
 
 	__asm__ __volatile__(
 	"	lr  %0, [status32]	\n"
-	: "=&r"(temp));
+	: "=&r"(temp)
+	:
+	: "memory");
 
 	return temp;
 }
