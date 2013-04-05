@@ -1,0 +1,8 @@
+config I2C_AML
+        bool "Amlogic I2C Driver"
+        select I2C
+        select I2C_CHARDEV
+        select I2C_ALGOBIT
+	help
+          Yet another Amlogic I2C Driver, normal master
+

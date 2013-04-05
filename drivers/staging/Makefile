@@ -59,3 +59,4 @@ obj-$(CONFIG_INTEL_MEI)		+= mei/
 obj-$(CONFIG_MFD_NVEC)		+= nvec/
 obj-y				+= aml_fb/
 obj-y				+= cardreader/
+obj-y				+= aml_i2c/

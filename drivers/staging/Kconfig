@@ -134,6 +134,8 @@ source "drivers/staging/media/Kconfig"
 
 source "drivers/staging/aml_fb/Kconfig"
 
+source "drivers/staging/aml_i2c/Kconfig"
+
 source "drivers/staging/cardreader/Kconfig"
 
 endif # STAGING

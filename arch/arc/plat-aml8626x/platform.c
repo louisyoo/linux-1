@@ -27,6 +27,7 @@
 #include <plat/usbclock.h>
 #include <plat/nand.h>
 #include <plat/card_io.h>
+#include <plat/pinmux.h>
 
 /* ------------------------------------------------------------------------- */
 #ifdef CONFIG_USB_DWCOTG
@@ -282,6 +283,59 @@ static struct platform_device a3_nand_device = {
 };
 #endif
 
+
+#ifdef CONFIG_I2C_AML
+#include <linux/i2c.h>
+#include <linux/i2c-aml.h>
+
+static struct aml_i2c_platform aml_i2c_plat = {
+    .wait_count     = 1000,
+    .wait_ack_interval  = 5,
+    .wait_read_interval = 5,
+    .wait_xfer_interval = 50,
+    .master_no      = AML_I2C_MASTER_B,
+    .use_pio            = 0,
+    .master_i2c_speed   = AML_I2C_SPPED_100K,
+
+    .master_pinmux = {
+        .scl_reg    = A3_I2C_MASTER_B_GPIOA_5_REG,
+        .scl_bit    = A3_I2C_MASTER_B_GPIOA_5_BIT,
+        .sda_reg    = A3_I2C_MASTER_B_GPIOA_4_REG,
+        .sda_bit    = A3_I2C_MASTER_B_GPIOA_4_BIT,
+    }
+};
+
+static struct resource aml_i2c_resource[] = {
+    [0] = {/*master a*/
+        .start =    MESON_I2C_MASTER_A_START,
+        .end   =    MESON_I2C_MASTER_A_END,
+        .flags =    IORESOURCE_MEM,
+    },
+    [1] = {/*master b*/
+        .start =    MESON_I2C_MASTER_B_START,
+        .end   =    MESON_I2C_MASTER_B_END,
+        .flags =    IORESOURCE_MEM,
+    },
+    [2] = {/*slave*/
+        .start =    MESON_I2C_SLAVE_START,
+        .end   =    MESON_I2C_SLAVE_END,
+        .flags =    IORESOURCE_MEM,
+    },
+};
+
+static struct platform_device aml_i2c_device = {
+    .name         = "aml-i2c",
+    .id       = -1,
+    .num_resources    = ARRAY_SIZE(aml_i2c_resource),
+    .resource     = aml_i2c_resource,
+    .dev = {
+        .platform_data = &aml_i2c_plat,
+    },
+};
+
+#endif
+
+
 static struct platform_device *dw_platform_devices[] __initdata = {
 #ifdef CONFIG_USB_DWCOTG
 
@@ -301,7 +355,41 @@ static struct platform_device *dw_platform_devices[] __initdata = {
 #ifdef CONFIG_AM_NAND
 	&a3_nand_device,
 #endif
+#ifdef CONFIG_I2C_AML
+	&aml_i2c_device,
+#endif
 };
+
+static struct i2c_board_info __initdata aml_i2c_info[] = {
+#ifdef CONFIG_EEPROM_AT24
+    {I2C_BOARD_INFO("24c02",  0x50),},
+    /*{I2C_BOARD_INFO("24c64",  0x50),},*/
+#endif
+#ifdef CONFIG_TOUCHSCREEN_TSC2007
+    {
+        I2C_BOARD_INFO("tsc2007", 0x48),
+        .irq = INT_GPIO_0,
+        .platform_data = (void *)&tsc2007_pdata,
+    },
+#endif
+#ifdef CONFIG_SN7325
+    {
+        I2C_BOARD_INFO("sn7325", 0x59),
+        .platform_data = (void *)&sn7325_pdata,
+    },
+#endif
+#ifdef CONFIG_SND_AML_A3_WM8988
+    {
+        I2C_BOARD_INFO("wm8988", 0x1A),
+        .platform_data = (void *)0,
+    },
+#endif
+	{
+		I2C_BOARD_INFO("gt811", 0x5D),
+		//I2C_BOARD_INFO("gt811", 0x1c),
+	},
+};
+
 
 int __init dw_platform_init(void)
 {
@@ -310,6 +398,18 @@ int __init dw_platform_init(void)
 	set_usb_phy_id_mode(USB_PHY_PORT_A, USB_PHY_MODE_HW);
 	set_usb_phy_id_mode(USB_PHY_PORT_B, USB_PHY_MODE_SW_HOST);
 #endif
+
+#ifdef CONFIG_I2C_AML
+	clear_mio_mux(0, (1 << 5) |(1 << 6) |(1 << 7) |
+			 (1 << 8) |(1 << 9) |(1 << 10));
+	clear_mio_mux(6, (1 << 6) |(1 << 7));
+	clear_mio_mux(7, (1 << 12) |(1 << 13));
+	set_mio_mux(6, (1 << 8) |(1 << 9));
+	clear_mio_mux(3, (1 << 4) |(1 << 12));
+
+	i2c_register_board_info (1, aml_i2c_info, ARRAY_SIZE(aml_i2c_info));
+#endif
+
 	return platform_add_devices(dw_platform_devices,
 		ARRAY_SIZE(dw_platform_devices));
 }
