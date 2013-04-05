@@ -6,7 +6,7 @@
 # published by the Free Software Foundation.
 #
 
-obj-y += platform.o irq.o clock.o clkdev.o power_gate.o pinmux.o
+obj-y += platform.o irq.o clock.o clkdev.o power_gate.o pinmux.o gpio.o
 obj-$(CONFIG_CARDREADER) += sd_pad.o
 obj-$(CONFIG_AM_INTC) += am_intc.o
 obj-$(CONFIG_USB_DWCOTG) += usbclock.o
