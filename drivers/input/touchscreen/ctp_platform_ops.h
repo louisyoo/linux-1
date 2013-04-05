@@ -34,7 +34,6 @@
 #include <asm/irq.h>
 #include <asm/io.h>
 
-#include <mach/irqs.h>
 #include <linux/i2c.h>
 
 // gpio base address

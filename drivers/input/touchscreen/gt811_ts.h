@@ -19,13 +19,11 @@
 #ifndef 	_LINUX_GT811_H
 #define		_LINUX_GT811_H
 
-#include <linux/earlysuspend.h>
 #include <linux/hrtimer.h>
 #include <linux/i2c.h>
 #include <linux/input.h>
 
 //*************************TouchScreen Work Part*****************************
-#define GOODIX_I2C_NAME "Goodix-TS"
 #define GT801_PLUS
 #define GT801_NUVOTON
 #define GUITAR_UPDATE_STATE 0x02
@@ -44,7 +42,8 @@
 
 //#define SHUTDOWN_PORT 	    S3C64XX_GPL(10)
 //#define INT_PORT 	          S3C64XX_GPN(15)
-#define INT_PORT                     (SW_INT_IRQNO_PIO)
+//#define INT_PORT                     (SW_INT_IRQNO_PIO)
+//#define INT_PORT                     5
 //#ifdef INT_PORT
 //	#define TS_INT 		        gpio_to_irq(INT_PORT)			//Interrupt Number,EINT18(119)
 //	#define INT_CFG    	      S3C_GPIO_SFN(3) 					//IO configer as EINT
@@ -123,7 +122,6 @@ struct goodix_ts_data {
        unsigned int version;
 /////////////////////////////// UPDATE STEP 6 END /////////////////////////////////////////////////////////////////
 
-	struct early_suspend early_suspend;
 	int (*power)(struct goodix_ts_data * ts, int on);
 };
 

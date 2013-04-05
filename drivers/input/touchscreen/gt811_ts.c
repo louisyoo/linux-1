@@ -31,11 +31,9 @@
 #include <asm/irq.h>
 #include <asm/io.h>
 
-#include <mach/irqs.h>
-#include <mach/system.h>
-#include <mach/hardware.h>
-#include <mach/sys_config.h>
 #include "ctp_platform_ops.h"
+
+#include <plat/gpio.h>
 
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
@@ -114,9 +112,9 @@ int int_count = 0;
 
 ///////////////////////////////////////////////
 //specific tp related macro: need be configured for specific tp
-#define CTP_IRQ_NO			(gpio_int_info[0].port_num)
+//#define CTP_IRQ_NO			(gpio_int_info[0].port_num)
+#define CTP_IRQ_NO			0
 #define CTP_IRQ_MODE			(NEGATIVE_EDGE)
-#define CTP_NAME			GOODIX_I2C_NAME
 #define TS_RESET_LOW_PERIOD		(15)
 #define TS_INITIAL_HIGH_PERIOD		(15)
 #define TS_WAKEUP_LOW_PERIOD	(100)
@@ -127,6 +125,7 @@ int int_count = 0;
 #define  SCREEN_MAX_WIDTH		(screen_max_y)
 #define PRESS_MAX			(255)
 
+#if 0
 static void* __iomem gpio_addr = NULL;
 static int gpio_int_hdle = 0;
 static int gpio_wakeup_hdle = 0;
@@ -134,6 +133,8 @@ static int gpio_reset_hdle = 0;
 static int gpio_wakeup_enable = 1;
 static int gpio_reset_enable = 1;
 static user_gpio_set_t  gpio_int_info[1];
+#endif
+
 
 static int screen_max_x = 0;
 static int screen_max_y = 0;
@@ -149,7 +150,7 @@ static int	int_cfg_addr[]={PIO_INT_CFG0_OFFSET,PIO_INT_CFG1_OFFSET,
 union{
 	unsigned short dirty_addr_buf[2];
 	const unsigned short normal_i2c[2];
-}u_i2c_addr = {{0x00},};
+}u_i2c_addr = {0};
 
 
 static int reg_val;
@@ -169,7 +170,8 @@ static int ctp_get_pendown_state(void)
 	static int state = FREE_UP;
 
 	//get the input port state
-	reg_val = readl(gpio_addr + PIOH_DATA);
+//	reg_val = readl(gpio_addr + PIOH_DATA);
+	reg_val =0;
 	//printk("reg_val = %x\n",reg_val);
 	if(!(reg_val & (1<<CTP_IRQ_NO))){
 		state = PRESS_DOWN;
@@ -190,12 +192,13 @@ static void ctp_clear_penirq(void)
 	int reg_val;
 	//clear the IRQ_EINT29 interrupt pending
 	//printk("clear pend irq pending\n");
-	reg_val = readl(gpio_addr + PIO_INT_STAT_OFFSET);
+	reg_val=0;
+	//reg_val = readl(gpio_addr + PIO_INT_STAT_OFFSET);
 	//writel(reg_val,gpio_addr + PIO_INT_STAT_OFFSET);
 	//writel(reg_val&(1<<(IRQ_EINT21)),gpio_addr + PIO_INT_STAT_OFFSET);
 	if((reg_val = (reg_val&(1<<(CTP_IRQ_NO))))){
 		print_int_info("==CTP_IRQ_NO=\n");              
-		writel(reg_val,gpio_addr + PIO_INT_STAT_OFFSET);
+	//	writel(reg_val,gpio_addr + PIO_INT_STAT_OFFSET);
 	}
 	return;
 }
@@ -215,8 +218,7 @@ static int ctp_set_irq_mode(char *major_key , char *subkey, ext_int_mode int_mod
 	__u32 reg_val = 0;
 	//config gpio to int mode
 	printk("%s: config gpio to int mode. \n", __func__);
-#ifndef SYSCONFIG_GPIO_ENABLE
-#else
+#if 0
 	if(gpio_int_hdle){
 		gpio_release(gpio_int_hdle, 2);
 	}
@@ -231,8 +233,7 @@ static int ctp_set_irq_mode(char *major_key , char *subkey, ext_int_mode int_mod
 		gpio_int_info[0].port, gpio_int_info[0].port_num);
 #endif
 
-#ifdef AW_GPIO_INT_API_ENABLE
-#else
+#if 0
 	printk(" INTERRUPT CONFIG\n");
 	reg_num = (gpio_int_info[0].port_num)%8;
 	reg_addr = (gpio_int_info[0].port_num)/8;
@@ -267,8 +268,7 @@ static int ctp_set_gpio_mode(void)
 	int ret = 0;
 	//config gpio to io mode
 	printk("%s: config gpio to io mode. \n", __func__);
-#ifndef SYSCONFIG_GPIO_ENABLE
-#else
+#if 0
 	if(gpio_int_hdle){
 		gpio_release(gpio_int_hdle, 2);
 	}
@@ -298,10 +298,13 @@ static int ctp_judge_int_occur(void)
 	int reg_val;
 	int ret = -1;
 
+#if 0
 	reg_val = readl(gpio_addr + PIO_INT_STAT_OFFSET);
 	if(reg_val&(1<<(CTP_IRQ_NO))){
 		ret = 0;
 	}
+#endif
+
 	return ret; 	
 }
 
@@ -312,6 +315,7 @@ static int ctp_judge_int_occur(void)
 static void ctp_free_platform_resource(void)
 {
 	printk("=======%s=========.\n", __func__);
+#if 0
 	if(gpio_addr){
 		iounmap(gpio_addr);
 	}
@@ -327,7 +331,7 @@ static void ctp_free_platform_resource(void)
 	if(gpio_reset_hdle){
 		gpio_release(gpio_reset_hdle, 2);
 	}
-
+#endif
 	return;
 }
 
@@ -342,6 +346,7 @@ static int ctp_init_platform_resource(void)
 {
 	int ret = 0;
 
+#if 0
 	gpio_addr = ioremap(PIO_BASE_ADDRESS, PIO_RANGE_SIZE);
 	//printk("%s, gpio_addr = 0x%x. \n", __func__, gpio_addr);
 	if(!gpio_addr) {
@@ -355,11 +360,13 @@ static int ctp_init_platform_resource(void)
 		gpio_wakeup_enable = 0;
 	}
 
-	gpio_reset_hdle = gpio_request_ex("ctp_para", "ctp_reset");
+	gpio
+_reset_hdle = gpio_request_ex("ctp_para", "ctp_reset");
 	if(!gpio_reset_hdle) {
 		pr_warning("%s: tp_reset request gpio fail!\n", __func__);
 		gpio_reset_enable = 0;
 	}
+#endif
 
 	return ret;
 
@@ -379,6 +386,8 @@ static int ctp_fetch_sysconfig_para(void)
 {
 	int ret = -1;
 	int ctp_used = -1;
+
+#if 0
 	char name[I2C_NAME_SIZE];
 	script_parser_value_type_t type = SCIRPT_PARSER_VALUE_TYPE_STRING;
 
@@ -457,6 +466,7 @@ static int ctp_fetch_sysconfig_para(void)
 script_parser_fetch_err:
 	pr_notice("=========script_parser_fetch_err============\n");
 	return ret;
+#endif
 }
 
 /**
@@ -466,6 +476,7 @@ script_parser_fetch_err:
 static void ctp_reset(void)
 {
 	printk("%s. \n", __func__);
+#if 0
 	if(gpio_reset_enable){
 		if(EGPIO_SUCCESS != gpio_write_one_pin_value(gpio_reset_hdle, 0, "ctp_reset")){
 			printk("%s: err when operate gpio. \n", __func__);
@@ -476,6 +487,7 @@ static void ctp_reset(void)
 		}
 		mdelay(TS_INITIAL_HIGH_PERIOD);
 	}
+#endif
 }
 
 /**
@@ -484,6 +496,7 @@ static void ctp_reset(void)
  */
 static void ctp_wakeup(void)
 {
+#if 0
 	printk("%s. \n", __func__);
 	if(1 == gpio_wakeup_enable){  
 		if(EGPIO_SUCCESS != gpio_write_one_pin_value(gpio_wakeup_hdle, 1, "ctp_wakeup")){
@@ -496,6 +509,7 @@ static void ctp_wakeup(void)
 		mdelay(TS_WAKEUP_HIGH_PERIOD);
 
 	}
+#endif
 	return;
 }
 /**
@@ -506,18 +520,6 @@ static void ctp_wakeup(void)
  */
 int ctp_detect(struct i2c_client *client, struct i2c_board_info *info)
 {
-	struct i2c_adapter *adapter = client->adapter;
-
-	if(twi_id == adapter->nr)
-	{
-		pr_info("%s: Detected chip %s at adapter %d, address 0x%02x\n",
-			 __func__, CTP_NAME, i2c_adapter_id(adapter), client->addr);
-
-		strlcpy(info->type, CTP_NAME, I2C_NAME_SIZE);
-		return 0;
-	}else{
-		return -ENODEV;
-	}
 }
 ////////////////////////////////////////////////////////////////
 
@@ -793,9 +795,11 @@ static void gt811_irq_enable(struct goodix_ts_data *ts)
     //if (ts->irq_is_disable) 
     {		
         //enable_irq(ts->irq);
+#if 0
         reg_val = readl(gpio_addr + PIO_INT_CTRL_OFFSET);
         reg_val |=(1<<CTP_IRQ_NO);
         writel(reg_val,gpio_addr + PIO_INT_CTRL_OFFSET);
+#endif
         //ts->irq_is_disable = 0;	
     }	
     //spin_unlock_irqrestore(&ts->irq_lock, irqflags);
@@ -808,9 +812,12 @@ static void gt811_irq_disable(struct goodix_ts_data *ts)
     //if (!ts->irq_is_disable) 
     {		
         //disable_irq_nosync(ts->irq);	
+#if 0
         reg_val = readl(gpio_addr + PIO_INT_CTRL_OFFSET);
         reg_val &=~(1<<CTP_IRQ_NO);
         writel(reg_val,gpio_addr + PIO_INT_CTRL_OFFSET);
+#endif
+
         //ts->irq_is_disable = 1;	
     }	
     //spin_unlock_irqrestore(&ts->irq_lock, irqflags);
@@ -896,11 +903,13 @@ COORDINATE_POLL:
         if(point_data[3]==0xF0)
         {
             //gpio_direction_output(SHUTDOWN_PORT, 0);
+#if 0
             gpio_set_one_pin_io_status(gpio_wakeup_hdle, 1, "ctp_wakeup");
             gpio_write_one_pin_value(gpio_wakeup_hdle, 0, "ctp_wakeup");			
             msleep(1);
             //gpio_direction_input(SHUTDOWN_PORT);
             gpio_set_one_pin_io_status(gpio_wakeup_hdle, 0, "ctp_wakeup");
+#endif
             goodix_init_panel(ts);
             goto WORK_FUNC_END;
         }
@@ -1067,13 +1076,13 @@ static irqreturn_t goodix_ts_irq_handler(int irq, void *dev_id)
 
 	//printk(KERN_INFO"-------------------ts_irq_handler------------------\n");
 	//disable_irq_nosync(ts->client->irq);
-	reg_val = readl(gpio_addr + PIO_INT_STAT_OFFSET);
+//	reg_val = readl(gpio_addr + PIO_INT_STAT_OFFSET);
      
 	if(reg_val&(1<<(CTP_IRQ_NO)))
 	{	
 		print_int_info("%s: %d. ==CTP_IRQ_NO=\n", __func__, __LINE__);
 		//clear the CTP_IRQ_NO interrupt pending
-		writel(reg_val&(1<<(CTP_IRQ_NO)),gpio_addr + PIO_INT_STAT_OFFSET);
+//		writel(reg_val&(1<<(CTP_IRQ_NO)),gpio_addr + PIO_INT_STAT_OFFSET);
 		queue_work(goodix_wq, &ts->work);
 	}
 	else
@@ -1112,7 +1121,7 @@ static int goodix_ts_power(struct goodix_ts_data * ts, int on)
 			return ret;
 			
         case 1:
-#ifdef INT_PORT	                     //suggest use INT PORT to wake up !!!
+#if 0
             //gpio_direction_output(INT_PORT, 0) ;
             gpio_set_one_pin_io_status(gpio_int_hdle, 1, "ctp_int_port");
             gpio_write_one_pin_value(gpio_int_hdle, 0, "ctp_int_port");
@@ -1146,7 +1155,7 @@ static int goodix_ts_power(struct goodix_ts_data * ts, int on)
 				//Config CTP_IRQ_NO as input
 	  			gpio_set_one_pin_io_status(gpio_int_hdle,0, "ctp_int_port");
        
-#else
+//#else
 				//gpio_direction_output(SHUTDOWN_PORT,0);
 				gpio_set_one_pin_io_status(gpio_wakeup_hdle, 1, "ctp_wakeup");
 				gpio_write_one_pin_value(gpio_wakeup_hdle, 0, "ctp_wakeup");
@@ -1205,9 +1214,6 @@ static int goodix_ts_probe(struct i2c_client *client, const struct i2c_device_id
 
 	i2c_connect_client = client;
 
-	
-	
-	
 /*	
 	ret = gpio_request(SHUTDOWN_PORT, "RESET_INT");
 	if (ret < 0)
@@ -1217,49 +1223,23 @@ static int goodix_ts_probe(struct i2c_client *client, const struct i2c_device_id
 	}
 */	
 	//s3c_gpio_setpull(SHUTDOWN_PORT, S3C_GPIO_PULL_UP);		//set GPIO pull-up
-	gpio_set_one_pin_pull(gpio_wakeup_hdle, 1, "ctp_wakeup");
+//	gpio_set_one_pin_pull(gpio_wakeup_hdle, 1, "ctp_wakeup");
 
-	
-	for(retry=0;retry < 5; retry++)
-	{
-		//gpio_direction_output(SHUTDOWN_PORT,0);
-		gpio_set_one_pin_io_status(gpio_wakeup_hdle, 1, "ctp_wakeup");
-		gpio_write_one_pin_value(gpio_wakeup_hdle, 0, "ctp_wakeup");		
-		msleep(1);
-		//gpio_direction_input(SHUTDOWN_PORT);
-		gpio_set_one_pin_io_status(gpio_wakeup_hdle, 0, "ctp_wakeup")	;	
-		msleep(100);
-	
-		ret =i2c_write_bytes(client, &test_data, 1);	//Test I2C connection.
-		if (ret > 0)
-			break;
-		dev_info(&client->dev, "GT811 I2C TEST FAILED!Please check the HARDWARE connect\n");
-	}
-
-	if(ret <= 0)
-	{
-		dev_err(&client->dev, "Warnning: I2C communication might be ERROR!\n");
-		goto err_i2c_failed;
-	}	
+//mode: GPIO_OUTPUT_MODE, GPIO_INPUT_MODE
+//	set_gpio_mode(bank, bit, mode);
+	set_gpio_mode(GPIOA_BANK, GPIOA_bit(7), GPIO_OUTPUT_MODE);
+//	set_gpio_val(bank,bit,bal)
+	set_gpio_val(GPIOA_BANK, GPIOA_bit(7), 0);
+	msleep(1);
+	set_gpio_val(GPIOA_BANK, GPIOA_bit(7), 1);
+	msleep(100);
 
 	flush_workqueue(goodix_wq);
 	INIT_WORK(&ts->work, goodix_ts_work_func);		//init work_struct
 	ts->client = client;
 	i2c_set_clientdata(client, ts);
 	pdata = client->dev.platform_data;
-/////////////////////////////// UPDATE STEP 1 START/////////////////////////////////////////////////////////////////
-#ifdef AUTO_UPDATE_GT811		//modify by andrew
-	msleep(20);
-        goodix_read_version(ts);
-            
-        ret = gt811_downloader( ts, goodix_gt811_firmware);
-        if(ret < 0)
-        {
-            dev_err(&client->dev, "Warnning: gt811 update might be ERROR!\n");
-            //goto err_input_dev_alloc_failed;
-        }
-#endif
-///////////////////////////////UPDATE STEP 1 END////////////////////////////////////////////////////////////////      
+
 #ifdef INT_PORT	
 	client->irq=INT_PORT;		//If not defined in client
 	if (client->irq)
@@ -1288,9 +1268,9 @@ static int goodix_ts_probe(struct i2c_client *client, const struct i2c_device_id
 
     //disable_irq(client->irq);
     //Disable IRQ_EINT21 of PIO Interrupt
-    reg_val = readl(gpio_addr + PIO_INT_CTRL_OFFSET);
-    reg_val &=~(1<<CTP_IRQ_NO);
-    writel(reg_val,gpio_addr + PIO_INT_CTRL_OFFSET);
+//    reg_val = readl(gpio_addr + PIO_INT_CTRL_OFFSET);
+//    reg_val &=~(1<<CTP_IRQ_NO);
+//    writel(reg_val,gpio_addr + PIO_INT_CTRL_OFFSET);
 
 
 err_gpio_request_failed:
@@ -1362,7 +1342,7 @@ err_gpio_request_failed:
     {
         dev_err(&client->dev,"Cannot allocate ts INT!ERRNO:%d\n", ret);
         //gpio_direction_input(INT_PORT);
-        gpio_set_one_pin_io_status(gpio_int_hdle, 0, "ctp_int_port");
+//        gpio_set_one_pin_io_status(gpio_int_hdle, 0, "ctp_int_port");
         //gpio_free(INT_PORT);
         goto err_init_godix_ts;
     }
@@ -1373,9 +1353,9 @@ err_gpio_request_failed:
 #else
         {
             //disable_irq(client->irq);
-            reg_val = readl(gpio_addr + PIO_INT_CTRL_OFFSET);
-            reg_val &=~(1<<CTP_IRQ_NO);
-            writel(reg_val,gpio_addr + PIO_INT_CTRL_OFFSET);
+//            reg_val = readl(gpio_addr + PIO_INT_CTRL_OFFSET);
+//            reg_val &=~(1<<CTP_IRQ_NO);
+//            writel(reg_val,gpio_addr + PIO_INT_CTRL_OFFSET);
         }	 
 #endif
         ts->use_irq = 1;
@@ -1397,9 +1377,9 @@ err_gpio_request_failed:
 #else
     {
         //enable_irq(client->irq);
-        reg_val = readl(gpio_addr + PIO_INT_CTRL_OFFSET);
-        reg_val |=(1<<CTP_IRQ_NO);
-        writel(reg_val,gpio_addr + PIO_INT_CTRL_OFFSET);
+//        reg_val = readl(gpio_addr + PIO_INT_CTRL_OFFSET);
+//        reg_val |=(1<<CTP_IRQ_NO);
+//        writel(reg_val,gpio_addr + PIO_INT_CTRL_OFFSET);
     }	   
 #endif
 
@@ -1414,23 +1394,6 @@ err_gpio_request_failed:
     register_early_suspend(&ts->early_suspend);
 #endif
 
-/////////////////////////////// UPDATE STEP 2 START /////////////////////////////////////////////////////////////////
-#ifdef CONFIG_TOUCHSCREEN_GOODIX_IAP
-	goodix_proc_entry = create_proc_entry("goodix-update", 0666, NULL);
-	if(goodix_proc_entry == NULL)
-	{
-		dev_info(&client->dev, "Couldn't create proc entry!\n");
-		ret = -ENOMEM;
-		goto err_create_proc_entry;
-	}
-	else
-	{
-		dev_info(&client->dev, "Create proc entry success!\n");
-		goodix_proc_entry->write_proc = goodix_update_write;
-		goodix_proc_entry->read_proc = goodix_update_read;
-	}
-#endif
-///////////////////////////////UPDATE STEP 2 END /////////////////////////////////////////////////////////////////
 	dev_info(&client->dev,"Start %s in %s mode,Driver Modify Date:2012-01-05\n", 
 		ts->input_dev->name, ts->use_irq ? "interrupt" : "polling");
 	return 0;
@@ -1443,7 +1406,7 @@ err_init_godix_ts:
 		free_irq(client->irq,ts);
 #ifdef INT_PORT	
         //gpio_direction_input(INT_PORT);
-        gpio_set_one_pin_io_status(gpio_int_hdle, 0, "ctp_int_port");
+//        gpio_set_one_pin_io_status(gpio_int_hdle, 0, "ctp_int_port");
         //gpio_free(INT_PORT);
 
 #endif	
@@ -1481,17 +1444,12 @@ static int goodix_ts_remove(struct i2c_client *client)
 #ifdef CONFIG_HAS_EARLYSUSPEND
 	unregister_early_suspend(&ts->early_suspend);
 #endif
-/////////////////////////////// UPDATE STEP 3 START/////////////////////////////////////////////////////////////////
-#ifdef CONFIG_TOUCHSCREEN_GOODIX_IAP
-	remove_proc_entry("goodix-update", NULL);
-#endif
-/////////////////////////////////UPDATE STEP 3 END///////////////////////////////////////////////////////////////
 
     if (ts && ts->use_irq) 
     {
 #ifdef INT_PORT
         //gpio_direction_input(INT_PORT);
-        gpio_set_one_pin_io_status(gpio_int_hdle, 0, "ctp_int_port");
+        //gpio_set_one_pin_io_status(gpio_int_hdle, 0, "ctp_int_port");
         //gpio_free(INT_PORT);
 
 #endif	
@@ -1520,9 +1478,9 @@ static int goodix_ts_suspend(struct i2c_client *client, pm_message_t mesg)
         //#else
     {
         //disable_irq(client->irq);
-        reg_val = readl(gpio_addr + PIO_INT_CTRL_OFFSET);
-        reg_val &=~(1<<CTP_IRQ_NO);
-        writel(reg_val,gpio_addr + PIO_INT_CTRL_OFFSET);
+//        reg_val = readl(gpio_addr + PIO_INT_CTRL_OFFSET);
+//        reg_val &=~(1<<CTP_IRQ_NO);
+//        writel(reg_val,gpio_addr + PIO_INT_CTRL_OFFSET);
         ts->irq_is_disable = 1;
     }
     //#endif
@@ -1532,9 +1490,9 @@ static int goodix_ts_suspend(struct i2c_client *client, pm_message_t mesg)
         ret = cancel_work_sync(&ts->work);
         if(ret && ts->use_irq) {
         //enable_irq(client->irq);
-        	reg_val = readl(gpio_addr + PIO_INT_CTRL_OFFSET);
-        	reg_val |=(1<<CTP_IRQ_NO);
-        	writel(reg_val,gpio_addr + PIO_INT_CTRL_OFFSET);
+//        	reg_val = readl(gpio_addr + PIO_INT_CTRL_OFFSET);
+  //      	reg_val |=(1<<CTP_IRQ_NO);
+    //    	writel(reg_val,gpio_addr + PIO_INT_CTRL_OFFSET);
       	}
 
     if (ts->power) {	/* ?????work????????GPIO???????????	*/
@@ -1560,18 +1518,18 @@ static int goodix_ts_resume(struct i2c_client *client)
         else
         	printk(KERN_ERR "goodix_ts_resume power on success\n");
     }
-    reg_val = readl(gpio_addr + PIO_INT_CTRL_OFFSET);
-    reg_val |=(1<<CTP_IRQ_NO);
-    writel(reg_val,gpio_addr + PIO_INT_CTRL_OFFSET);
+//    reg_val = readl(gpio_addr + PIO_INT_CTRL_OFFSET);
+//    reg_val |=(1<<CTP_IRQ_NO);
+//    writel(reg_val,gpio_addr + PIO_INT_CTRL_OFFSET);
 
     if (ts->use_irq){
 #ifndef STOP_IRQ_TYPE
         gt811_irq_enable(ts);     //KT ADD 1202
 #else
         //enable_irq(client->irq);
-        reg_val = readl(gpio_addr + PIO_INT_CTRL_OFFSET);
-        reg_val |=(1<<CTP_IRQ_NO);
-        writel(reg_val,gpio_addr + PIO_INT_CTRL_OFFSET);
+//        reg_val = readl(gpio_addr + PIO_INT_CTRL_OFFSET);
+//        reg_val |=(1<<CTP_IRQ_NO);
+//        writel(reg_val,gpio_addr + PIO_INT_CTRL_OFFSET);
 #endif
     }
     else
@@ -1600,780 +1558,6 @@ static void goodix_ts_late_resume(struct early_suspend *h)
 
 }
 #endif
-/////////////////////////////// UPDATE STEP 4 START/////////////////////////////////////////////////////////////////
-//******************************Begin of firmware update surpport*******************************
-#ifdef CONFIG_TOUCHSCREEN_GOODIX_IAP
-static struct file * update_file_open(char * path, mm_segment_t * old_fs_p)
-{
-	struct file * filp = NULL;
-	int errno = -1;
-		
-	filp = filp_open(path, O_RDONLY, 0644);
-	
-	if(!filp || IS_ERR(filp))
-	{
-		if(!filp)
-			errno = -ENOENT;
-		else 
-			errno = PTR_ERR(filp);					
-		printk(KERN_ERR "The update file for Guitar open error.\n");
-		return NULL;
-	}
-	*old_fs_p = get_fs();
-	set_fs(get_ds());
-
-	filp->f_op->llseek(filp,0,0);
-	return filp ;
-}
-
-static void update_file_close(struct file * filp, mm_segment_t old_fs)
-{
-	set_fs(old_fs);
-	if(filp)
-		filp_close(filp, NULL);
-}
-static int update_get_flen(char * path)
-{
-	struct file * file_ck = NULL;
-	mm_segment_t old_fs;
-	int length ;
-	
-	file_ck = update_file_open(path, &old_fs);
-	if(file_ck == NULL)
-		return 0;
-
-	length = file_ck->f_op->llseek(file_ck, 0, SEEK_END);
-	//printk("File length: %d\n", length);
-	if(length < 0)
-		length = 0;
-	update_file_close(file_ck, old_fs);
-	return length;	
-}
-
-static int goodix_update_write(struct file *filp, const char __user *buff, unsigned long len, void *data)
-{
-    unsigned char cmd[120];
-    int ret = -1;
-    int retry = 0;
-    static unsigned char update_path[60];
-    struct goodix_ts_data *ts;
-    struct file * file_data = NULL;
-    mm_segment_t old_fs;
-    unsigned char *file_ptr = NULL;
-    unsigned int file_len;
-	
-    ts = i2c_get_clientdata(i2c_connect_client);
-    if(ts==NULL)
-    {
-        printk(KERN_INFO"goodix write to kernel via proc file!@@@@@@\n");
-        return 0;
-    }
-
-    //printk(KERN_INFO"goodix write to kernel via proc file!@@@@@@\n");
-    if(copy_from_user(&cmd, buff, len))
-    {
-        printk(KERN_INFO"goodix write to kernel via proc file!@@@@@@\n");
-        return -EFAULT;
-    }
-    //printk(KERN_INFO"Write cmd is:%d,write len is:%ld\n",cmd[0], len);
-    switch(cmd[0])
-    {
-        case APK_UPDATE_TP:
-            printk(KERN_INFO"Write cmd is:%d,cmd arg is:%s,write len is:%ld\n",cmd[0], &cmd[1], len);
-            memset(update_path, 0, 60);
-            strncpy(update_path, cmd+1, 60);
-
-#ifndef STOP_IRQ_TYPE
-            gt811_irq_disable(ts);     //KT ADD 1202
-#else
-            {
-                //disable_irq(client->irq);
-                reg_val = readl(gpio_addr + PIO_INT_CTRL_OFFSET);
-                reg_val &=~(1<<CTP_IRQ_NO);
-                writel(reg_val,gpio_addr + PIO_INT_CTRL_OFFSET);
-            }
-#endif
-            file_data = update_file_open(update_path, &old_fs);
-            if(file_data == NULL)   //file_data has been opened at the last time
-            {
-                dev_info(&ts->client->dev, "cannot open update file\n");
-                return 0;
-            }
-
-            file_len = update_get_flen(update_path);
-            dev_info(&ts->client->dev, "Update file length:%d\n", file_len);
-            file_ptr = (unsigned char*)vmalloc(file_len);
-            if(file_ptr==NULL)
-            {
-                dev_info(&ts->client->dev, "cannot malloc memory!\n");
-                return 0;
-            }	
-
-            ret = file_data->f_op->read(file_data, file_ptr, file_len, &file_data->f_pos);
-            if(ret <= 0)
-            {
-                dev_info(&ts->client->dev, "read file data failed\n");
-                return 0;
-            }
-            update_file_close(file_data, old_fs);	
-
-            ret = gt811_downloader(ts, file_ptr);
-            vfree(file_ptr);
-            if(ret < 0)
-            {
-                printk(KERN_INFO"Warnning: GT811 update might be ERROR!\n");
-                return 0;
-            }
-
-            //i2c_pre_cmd(ts);
-
-            //gpio_direction_output(SHUTDOWN_PORT, 0);
-            gpio_set_one_pin_io_status(gpio_wakeup_hdle, 1, "ctp_wakeup");
-            gpio_write_one_pin_value(gpio_wakeup_hdle, 0, "ctp_wakeup");
-            msleep(5);
-            //gpio_direction_input(SHUTDOWN_PORT);
-            gpio_set_one_pin_io_status(gpio_wakeup_hdle, 0, "ctp_wakeup");
-            msleep(20);
-            for(retry=0; retry<3; retry++)
-            {
-                ret=goodix_init_panel(ts);
-                msleep(2);
-                if(ret != 0)	//Initiall failed
-                {
-                    dev_info(&ts->client->dev, "Init panel failed!\n");
-                    continue;
-                }
-                else
-                    break;
-
-            }
-            //gpio_free(INT_PORT); 
-            //ret = gpio_request(INT_PORT, "TS_INT"); //Request IO
-            if (ret < 0)
-            {
-                dev_err(&ts->client->dev, "Failed to request GPIO:%d, ERRNO:%d\n",(int)INT_PORT,ret);
-                return 0;
-            }
-            //s3c_gpio_setpull(INT_PORT, S3C_GPIO_PULL_NONE); //ret > 0 ?
-            gpio_set_one_pin_pull(gpio_int_hdle, 0, "ctp_int_port");        
-            //s3c_gpio_cfgpin(INT_PORT, INT_CFG);     //Set IO port function 
-            reg_val = readl(gpio_addr + PHO_CFG2_OFFSET);
-            reg_val &=(~(1<<20));
-            reg_val |=(3<<21);  
-            writel(reg_val,gpio_addr + PHO_CFG2_OFFSET);	
-            //gpio_direction_input(INT_PORT);
-            //s3c_gpio_setpull(INT_PORT, S3C_GPIO_PULL_UP); 
-            //s3c_gpio_cfgpin(INT_PORT, INT_CFG);	//Set IO port as interrupt port	
-            //s3c_gpio_setpull(INT_PORT, S3C_GPIO_PULL_NONE);
-            //while(1);		
-#ifndef STOP_IRQ_TYPE
-            gt811_irq_enable(ts);     //KT ADD 1202
-#else
-            {
-                //enable_irq(ts->client->irq);
-                reg_val = readl(gpio_addr + PIO_INT_CTRL_OFFSET);
-                reg_val |=(1<<CTP_IRQ_NO);
-                writel(reg_val,gpio_addr + PIO_INT_CTRL_OFFSET);
-            }	   
-#endif   
-            //i2c_end_cmd(ts);
-            return 1;
-
-        case APK_READ_FUN:							//functional command
-            if(cmd[1] == CMD_READ_VER)
-            {
-                printk(KERN_INFO"Read version!\n");
-                ts->read_mode = MODE_RD_VER;
-            }
-            else if(cmd[1] == CMD_READ_CFG)
-            {
-                printk(KERN_INFO"Read config info!\n");
-                ts->read_mode = MODE_RD_CFG;
-            }
-            else if (cmd[1] == CMD_READ_RAW)
-            {
-                printk(KERN_INFO"Read raw data!\n");
-                ts->read_mode = MODE_RD_RAW;
-            }
-            else if (cmd[1] == CMD_READ_CHIP_TYPE)
-            {
-                printk(KERN_INFO"Read chip type!\n");
-                ts->read_mode = MODE_RD_CHIP_TYPE;
-            }
-            return 1;
-
-        case APK_WRITE_CFG:			
-            printk(KERN_INFO"Begin write config info!Config length:%d\n",cmd[1]);
-            i2c_pre_cmd(ts);
-            ret = i2c_write_bytes(ts->client, cmd+2, cmd[1]+2); 
-            i2c_end_cmd(ts);
-            if(ret != 1)
-            {
-                printk("Write Config failed!return:%d\n",ret);
-                return -1;
-            }
-            return 1;
-
-        default:
-            return 0;
-    }
-	return 0;
-}
-
-static int goodix_update_read( char *page, char **start, off_t off, int count, int *eof, void *data )
-{
-    int ret = -1;
-    int len = 0;
-    int read_times = 0;
-    struct goodix_ts_data *ts;
-    unsigned char read_data[360] = {80, };
-
-	ts = i2c_get_clientdata(i2c_connect_client);
-	if(ts==NULL)
-		return 0;
-
-    printk("___READ__\n");
-    if(ts->read_mode == MODE_RD_VER)		//read version data
-    {
-        i2c_pre_cmd(ts);
-        ret = goodix_read_version(ts);
-        i2c_end_cmd(ts);
-        if(ret < 0)
-        {
-            printk(KERN_INFO"Read version data failed!\n");
-            return 0;
-        }
-
-        read_data[1] = (char)(ts->version&0xff);
-        read_data[0] = (char)((ts->version>>8)&0xff);
-
-        memcpy(page, read_data, 2);
-        //*eof = 1;
-        return 2;
-    }
-    else if (ts->read_mode == MODE_RD_CHIP_TYPE)
-    {
-        page[0] = GT811;
-        return 1;
-    }
-    else if(ts->read_mode == MODE_RD_CFG)
-    {
-
-        read_data[0] = 0x06;
-        read_data[1] = 0xa2;       // cfg start address
-        printk("read config addr is:%x,%x\n", read_data[0],read_data[1]);
-
-        len = 106;
-        i2c_pre_cmd(ts);
-        ret = i2c_read_bytes(ts->client, read_data, len+2);
-        i2c_end_cmd(ts);
-        if(ret <= 0)
-        {
-            printk(KERN_INFO"Read config info failed!\n");
-            return 0;
-        }
-
-        memcpy(page, read_data+2, len);
-        return len;
-    }
-    else if (ts->read_mode == MODE_RD_RAW)
-    {
-#define TIMEOUT (-100)
-        int retry = 0;
-        if (raw_data_ready != RAW_DATA_READY)
-        {
-            raw_data_ready = RAW_DATA_ACTIVE;
-        }
-
-RETRY:
-        read_data[0] = 0x07;
-        read_data[1] = 0x11;
-        read_data[2] = 0x01;
-
-        ret = i2c_write_bytes(ts->client, read_data, 3);
-
-#ifdef DEBUG
-        sum += read_times;
-        printk("count :%d\n", ++access_count);
-        printk("A total of try times:%d\n", sum);
-#endif
-
-        read_times = 0;
-        while (RAW_DATA_READY != raw_data_ready)
-        {
-            msleep(4);
-
-            if (read_times++ > 10)
-            {
-                if (retry++ > 5)
-                {
-                    return TIMEOUT;
-                }
-                goto RETRY;
-            }
-        }
-#ifdef DEBUG	    
-        printk("read times:%d\n", read_times);
-#endif	    
-        read_data[0] = 0x08;
-        read_data[1] = 0x80;       // raw data address
-
-        len = 160;
-
-        // msleep(4);
-
-        i2c_pre_cmd(ts);
-        ret = i2c_read_bytes(ts->client, read_data, len+2);    	    
-        //      i2c_end_cmd(ts);
-
-        if(ret <= 0)
-        {
-            printk(KERN_INFO"Read raw data failed!\n");
-            return 0;
-        }
-        memcpy(page, read_data+2, len);
-
-        read_data[0] = 0x09;
-        read_data[1] = 0xC0;
-        //	i2c_pre_cmd(ts);
-        ret = i2c_read_bytes(ts->client, read_data, len+2);    	    
-        i2c_end_cmd(ts);
-
-        if(ret <= 0)
-        {
-            printk(KERN_INFO"Read raw data failed!\n");
-            return 0;
-        }
-        memcpy(&page[160], read_data+2, len);
-
-#ifdef DEBUG
-        //**************
-        for (i = 0; i < 300; i++)
-        {
-            printk("%6x", page[i]);
-
-            if ((i+1) % 10 == 0)
-            {
-                printk("\n");
-            }
-        }
-        //********************/  
-#endif
-        raw_data_ready = RAW_DATA_NON_ACTIVE;
-
-        return (2*len);   
-
-    }
-    return 0;
-//#endif
-}             
-//********************************************************************************************
-static u8  is_equal( u8 *src , u8 *dst , int len )
-{
-    int i;
-
-#if 0    
-    for( i = 0 ; i < len ; i++ )
-    {
-        printk(KERN_INFO"[%02X:%02X]", src[i], dst[i]);
-        if((i+1)%10==0)printk("\n");
-    }
-#endif
-
-    for( i = 0 ; i < len ; i++ )
-    {
-        if ( src[i] != dst[i] )
-        {
-            return 0;
-        }
-    }
-
-    return 1;
-}
-
-static  u8 gt811_nvram_store( struct goodix_ts_data *ts )
-{
-    int ret;
-    int i;
-    u8 inbuf[3] = {REG_NVRCS_H,REG_NVRCS_L,0};
-    //u8 outbuf[3] = {};
-    ret = i2c_read_bytes( ts->client, inbuf, 3 );
-
-    if ( ret < 0 )
-    {
-        return 0;
-    }
-
-    if ( ( inbuf[2] & BIT_NVRAM_LOCK ) == BIT_NVRAM_LOCK )
-    {
-        return 0;
-    }
-
-    inbuf[2] = (1<<BIT_NVRAM_STROE);		//store command
-
-    for ( i = 0 ; i < 300 ; i++ )
-    {
-        ret = i2c_write_bytes( ts->client, inbuf, 3 );
-
-        if ( ret < 0 )
-            break;
-    }
-
-    return ret;
-}
-
-static u8  gt811_nvram_recall( struct goodix_ts_data *ts )
-{
-    int ret;
-    u8 inbuf[3] = {REG_NVRCS_H,REG_NVRCS_L,0};
-
-    ret = i2c_read_bytes( ts->client, inbuf, 3 );
-
-    if ( ret < 0 )
-    {
-        return 0;
-    }
-
-    if ( ( inbuf[2]&BIT_NVRAM_LOCK) == BIT_NVRAM_LOCK )
-    {
-        return 0;
-    }
-
-    inbuf[2] = ( 1 << BIT_NVRAM_RECALL );		//recall command
-    ret = i2c_write_bytes( ts->client , inbuf, 3);
-    return ret;
-}
-
-static  int gt811_reset( struct goodix_ts_data *ts )
-{
-    int ret = 1;
-    u8 retry;
-
-    unsigned char outbuf[3] = {0,0xff,0};
-    unsigned char inbuf[3] = {0,0xff,0};
-    //outbuf[1] = 1;
-
-    //gpio_direction_output(SHUTDOWN_PORT,0);
-    gpio_set_one_pin_io_status(gpio_wakeup_hdle, 1, "ctp_wakeup");
-    gpio_write_one_pin_value(gpio_wakeup_hdle, 0, "ctp_wakeup");    
-    msleep(20);
-    //gpio_direction_input(SHUTDOWN_PORT);
-    gpio_set_one_pin_io_status(gpio_wakeup_hdle, 0, "ctp_wakeup");
-    msleep(100);
-    for(retry=0;retry < 80; retry++)
-    {
-        ret =i2c_write_bytes(ts->client, inbuf, 0);	//Test I2C connection.
-        if (ret > 0)
-        {
-            msleep(10);
-            ret =i2c_read_bytes(ts->client, inbuf, 3);	//Test I2C connection.
-            if (ret > 0)
-            {
-                if(inbuf[2] == 0x55)
-                {
-                    ret =i2c_write_bytes(ts->client, outbuf, 3);
-                    msleep(10);
-                    break;						
-                }
-            }			
-        }
-        else
-        {
-            //gpio_direction_output(SHUTDOWN_PORT,0);
-            gpio_set_one_pin_io_status(gpio_wakeup_hdle, 1, "ctp_wakeup");
-            gpio_write_one_pin_value(gpio_wakeup_hdle, 0, "ctp_wakeup");    
-
-            msleep(20);
-            //gpio_direction_input(SHUTDOWN_PORT);
-            gpio_set_one_pin_io_status(gpio_wakeup_hdle, 0, "ctp_wakeup");
-            msleep(20);
-            dev_info(&ts->client->dev, "i2c address failed\n");
-        }	
-
-    }
-
-    dev_info(&ts->client->dev, "Detect address %0X\n", ts->client->addr);
-    //msleep(500);
-    return ret;	
-}
-
-static  int gt811_reset2( struct goodix_ts_data *ts )
-{
-    int ret = 1;
-    u8 retry;
-
-    //unsigned char outbuf[3] = {0,0xff,0};
-    unsigned char inbuf[3] = {0,0xff,0};
-    //outbuf[1] = 1;
-
-    //gpio_direction_output(SHUTDOWN_PORT,0);
-    gpio_set_one_pin_io_status(gpio_wakeup_hdle, 1, "ctp_wakeup");
-    gpio_write_one_pin_value(gpio_wakeup_hdle, 0, "ctp_wakeup");    
-
-    msleep(20);
-    //gpio_direction_input(SHUTDOWN_PORT);
-    gpio_set_one_pin_io_status(gpio_wakeup_hdle, 0, "ctp_wakeup");
-    msleep(100);
-    for(retry=0;retry < 80; retry++)
-    {
-        ret =i2c_write_bytes(ts->client, inbuf, 0);	//Test I2C connection.
-        if (ret > 0)
-        {
-            msleep(10);
-            ret =i2c_read_bytes(ts->client, inbuf, 3);	//Test I2C connection.
-            if (ret > 0)
-            {
-                //if(inbuf[2] == 0x55)
-                //{
-                //ret =i2c_write_bytes(ts->client, outbuf, 3);
-                //msleep(10);
-                break;						
-                //}
-            }			
-        }	
-
-    }
-    dev_info(&ts->client->dev, "Detect address %0X\n", ts->client->addr);
-    //msleep(500);
-    return ret;	
-}
-static  int gt811_set_address_2( struct goodix_ts_data *ts )
-{
-    unsigned char inbuf[3] = {0,0,0};
-    int i;
-
-    for ( i = 0 ; i < 12 ; i++ )
-    {
-        if ( i2c_read_bytes( ts->client, inbuf, 3) )
-        {
-            dev_info(&ts->client->dev, "Got response\n");
-            return 1;
-        }
-        dev_info(&ts->client->dev, "wait for retry\n");
-        msleep(50);
-    } 
-    return 0;
-}
-static u8  gt811_update_firmware( u8 *nvram, u16 start_addr, u16 length, struct goodix_ts_data *ts)
-{
-    u8 ret,err,retry_time,i;
-    u16 cur_code_addr;
-    u16 cur_frame_num, total_frame_num, cur_frame_len;
-    u32 gt80x_update_rate;
-
-    unsigned char i2c_data_buf[PACK_SIZE+2] = {0,};
-    unsigned char i2c_chk_data_buf[PACK_SIZE+2] = {0,};
-    
-    if( length > NVRAM_LEN - NVRAM_BOOT_SECTOR_LEN )
-    {
-        dev_info(&ts->client->dev, "Fw length %d is bigger than limited length %d\n", length, NVRAM_LEN - NVRAM_BOOT_SECTOR_LEN );
-        return 0;
-    }
-    	
-    total_frame_num = ( length + PACK_SIZE - 1) / PACK_SIZE;  
-
-    //gt80x_update_sta = _UPDATING;
-    gt80x_update_rate = 0;
-
-    for( cur_frame_num = 0 ; cur_frame_num < total_frame_num ; cur_frame_num++ )	  
-    {
-        retry_time = 5;
-        dev_info(&ts->client->dev, "PACK[%d]\n",cur_frame_num); 
-        cur_code_addr = /*NVRAM_UPDATE_START_ADDR*/start_addr + cur_frame_num * PACK_SIZE; 	
-        i2c_data_buf[0] = (cur_code_addr>>8)&0xff;
-        i2c_data_buf[1] = cur_code_addr&0xff;
-        
-        i2c_chk_data_buf[0] = i2c_data_buf[0];
-        i2c_chk_data_buf[1] = i2c_data_buf[1];
-        
-        if( cur_frame_num == total_frame_num - 1 )
-        {
-            cur_frame_len = length - cur_frame_num * PACK_SIZE;
-        }
-        else
-        {
-            cur_frame_len = PACK_SIZE;
-        }
-        
-        //strncpy(&i2c_data_buf[2], &nvram[cur_frame_num*PACK_SIZE], cur_frame_len);
-        for(i=0;i<cur_frame_len;i++)
-        {
-            i2c_data_buf[2+i] = nvram[cur_frame_num*PACK_SIZE+i];
-        }
-        do
-        {
-            err = 0;
-
-            //ret = gt811_i2c_write( guitar_i2c_address, cur_code_addr, &nvram[cur_frame_num*I2C_FRAME_MAX_LENGTH], cur_frame_len );		
-            ret = i2c_write_bytes(ts->client, i2c_data_buf, (cur_frame_len+2));
-            if ( ret <= 0 )
-            {
-                dev_info(&ts->client->dev, "write fail\n");
-                err = 1;
-            }
-            
-            ret = i2c_read_bytes(ts->client, i2c_chk_data_buf, (cur_frame_len+2));
-            // ret = gt811_i2c_read( guitar_i2c_address, cur_code_addr, inbuf, cur_frame_len);
-            if ( ret <= 0 )
-            {
-                dev_info(&ts->client->dev, "read fail\n");
-                err = 1;
-            }
-	    
-            if( is_equal( &i2c_data_buf[2], &i2c_chk_data_buf[2], cur_frame_len ) == 0 )
-            {
-                dev_info(&ts->client->dev, "not equal\n");
-                err = 1;
-            }
-			
-        } while ( err == 1 && (--retry_time) > 0 );
-        
-        if( err == 1 )
-        {
-            break;
-        }
-		
-        gt80x_update_rate = ( cur_frame_num + 1 )*128/total_frame_num;
-    
-    }
-
-    if( err == 1 )
-    {
-        dev_info(&ts->client->dev, "write nvram fail\n");
-        return 0;
-    }
-    
-    ret = gt811_nvram_store(ts);
-    
-    msleep( 20 );
-
-    if( ret == 0 )
-    {
-        dev_info(&ts->client->dev, "nvram store fail\n");
-        return 0;
-    }
-    
-    ret = gt811_nvram_recall(ts);
-
-    msleep( 20 );
-    
-    if( ret == 0 )
-    {
-        dev_info(&ts->client->dev, "nvram recall fail\n");
-        return 0;
-    }
-
-    for ( cur_frame_num = 0 ; cur_frame_num < total_frame_num ; cur_frame_num++ )		 //	read out all the code
-    {
-
-        cur_code_addr = NVRAM_UPDATE_START_ADDR + cur_frame_num*PACK_SIZE;
-        retry_time=5;
-        i2c_chk_data_buf[0] = (cur_code_addr>>8)&0xff;
-        i2c_chk_data_buf[1] = cur_code_addr&0xff;
-        
-        
-        if ( cur_frame_num == total_frame_num-1 )
-        {
-            cur_frame_len = length - cur_frame_num*PACK_SIZE;
-        }
-        else
-        {
-            cur_frame_len = PACK_SIZE;
-        }
-        
-        do
-        {
-            err = 0;
-            //ret = gt811_i2c_read( guitar_i2c_address, cur_code_addr, inbuf, cur_frame_len);
-            ret = i2c_read_bytes(ts->client, i2c_chk_data_buf, (cur_frame_len+2));
-
-            if ( ret == 0 )
-            {
-                err = 1;
-            }
-            
-            if( is_equal( &nvram[cur_frame_num*PACK_SIZE], &i2c_chk_data_buf[2], cur_frame_len ) == 0 )
-            {
-                err = 1;
-            }
-        } while ( err == 1 && (--retry_time) > 0 );
-        
-        if( err == 1 )
-        {
-            break;
-        }
-        
-        gt80x_update_rate = 127 + ( cur_frame_num + 1 )*128/total_frame_num;
-    }
-    
-    gt80x_update_rate = 255;
-    //gt80x_update_sta = _UPDATECHKCODE;
-
-    if( err == 1 )
-    {
-        dev_info(&ts->client->dev, "nvram validate fail\n");
-        return 0;
-    }
-    
-    return 1;
-}
-
-static u8  gt811_update_proc( u8 *nvram, u16 start_addr , u16 length, struct goodix_ts_data *ts )
-{
-    u8 ret;
-    u8 error = 0;
-    //struct tpd_info_t tpd_info;
-    GT811_SET_INT_PIN( 0 );
-    msleep( 20 );
-    ret = gt811_reset(ts);
-    if ( ret < 0 )
-    {
-        error = 1;
-        dev_info(&ts->client->dev, "reset fail\n");
-        goto end;
-    }
-
-    ret = gt811_set_address_2( ts );
-    if ( ret == 0 )
-    {
-        error = 1;
-        dev_info(&ts->client->dev, "set address fail\n");
-        goto end;
-    }
-
-    ret = gt811_update_firmware( nvram, start_addr, length, ts);
-    if ( ret == 0 )
-    {
-        error=1;
-       	dev_info(&ts->client->dev, "firmware update fail\n");
-        goto end;
-    }
-
-end:
-    GT811_SET_INT_PIN( 1 );
-    //gpio_free(INT_PORT);
-    //s3c_gpio_setpull(INT_PORT, S3C_GPIO_PULL_NONE);
-    gpio_set_one_pin_pull(gpio_int_hdle, 0, "ctp_int_port");  
-
-    msleep( 500 );
-    ret = gt811_reset2(ts);
-    if ( ret < 0 )
-    {
-        error=1;
-        dev_info(&ts->client->dev, "final reset fail\n");
-        goto end;
-    }
-    if ( error == 1 )
-    {
-        return 0; 
-    }
-
-    //i2c_pre_cmd(ts);
-    while(goodix_read_version(ts)<0);
-
-    //i2c_end_cmd(ts);
-    return 1;
-}
 
 u16 Little2BigEndian(u16 little_endian)
 {
@@ -2382,191 +1566,10 @@ u16 Little2BigEndian(u16 little_endian)
 	return (temp<<8)+((little_endian>>8)&0xff);
 }
 
-int  gt811_downloader( struct goodix_ts_data *ts,  unsigned char * data)
-{
-    struct tpd_firmware_info_t *fw_info = (struct tpd_firmware_info_t *)data;
-    //int i;
-    //unsigned short checksum = 0;
-    //unsigned int  checksum = 0;
-    unsigned int  fw_checksum = 0;
-    //unsigned char fw_chip_type;
-    unsigned short fw_version;
-    unsigned short fw_start_addr;
-    unsigned short fw_length;
-    unsigned char *data_ptr;
-    //unsigned char *file_ptr = &(fw_info->chip_type);
-    int retry = 0,ret;
-    int err = 0;
-    unsigned char rd_buf[4] = {0};
-    unsigned char *mandatory_base = "GOODIX";
-    unsigned char rd_rom_version;
-    unsigned char rd_chip_type;
-    unsigned char rd_nvram_flag;
-
-    //struct file * file_data = NULL;
-    //mm_segment_t old_fs;
-    //unsigned int rd_len;
-    //unsigned int file_len = 0;
-    //unsigned char i2c_data_buf[PACK_SIZE] = {0,};
-    
-    rd_buf[0]=0x14;
-    rd_buf[1]=0x00;
-    rd_buf[2]=0x80;
-    ret = i2c_write_bytes(ts->client, rd_buf, 3);
-    if(ret<0)
-    {
-        dev_info(&ts->client->dev, "i2c write failed\n");
-        goto exit_downloader;
-    }
-    rd_buf[0]=0x40;
-    rd_buf[1]=0x11;
-    ret = i2c_read_bytes(ts->client, rd_buf, 3);
-    if(ret<=0)
-    {
-        dev_info(&ts->client->dev, "i2c request failed!\n");
-        goto exit_downloader;
-    }
-    rd_chip_type = rd_buf[2];
-    rd_buf[0]=0xFB;
-    rd_buf[1]=0xED;
-    ret = i2c_read_bytes(ts->client, rd_buf, 3);
-    if(ret<=0)
-    {
-        dev_info(&ts->client->dev, "i2c read failed!\n");
-        goto exit_downloader;
-    }
-    rd_rom_version = rd_buf[2];
-    rd_buf[0]=0x06;
-    rd_buf[1]=0x94;
-    ret = i2c_read_bytes(ts->client, rd_buf, 3);
-    if(ret<=0)
-    {
-        dev_info(&ts->client->dev, "i2c read failed!\n");
-        goto exit_downloader;
-    }
-    rd_nvram_flag = rd_buf[2];
-
-    fw_version = Little2BigEndian(fw_info->version);
-    fw_start_addr = Little2BigEndian(fw_info->start_addr);
-    fw_length = Little2BigEndian(fw_info->length);	
-    data_ptr = &(fw_info->data);	
-
-    dev_info(&ts->client->dev,"chip_type=0x%02x\n", fw_info->chip_type);
-    dev_info(&ts->client->dev,"version=0x%04x\n", fw_version);
-    dev_info(&ts->client->dev,"rom_version=0x%02x\n",fw_info->rom_version);
-    dev_info(&ts->client->dev,"start_addr=0x%04x\n",fw_start_addr);
-    dev_info(&ts->client->dev,"file_size=0x%04x\n",fw_length);
-    fw_checksum = ((u32)fw_info->checksum[0]<<16) + ((u32)fw_info->checksum[1]<<8) + ((u32)fw_info->checksum[2]);
-    dev_info(&ts->client->dev,"fw_checksum=0x%06x\n",fw_checksum);
-    dev_info(&ts->client->dev,"%s\n", __func__ );
-    dev_info(&ts->client->dev,"current version 0x%04X, target verion 0x%04X\n", ts->version, fw_version );
-
-    //chk_chip_type:
-    if(rd_chip_type!=fw_info->chip_type)
-    {
-        dev_info(&ts->client->dev, "Chip type not match,exit downloader\n");
-        goto exit_downloader;
-    }
-
-    //chk_mask_version:	
-    if(!rd_rom_version)
-    {
-        if(fw_info->rom_version!=0x45)
-        {
-            dev_info(&ts->client->dev, "Rom version not match,exit downloader\n");
-            goto exit_downloader;
-        }
-        dev_info(&ts->client->dev, "Rom version E.\n");
-        goto chk_fw_version;
-    }
-    else if(rd_rom_version!=fw_info->rom_version);
-    {
-        dev_info(&ts->client->dev, "Rom version not match,exidownloader\n");
-        goto exit_downloader;
-    }
-    dev_info(&ts->client->dev, "Rom version %c\n",rd_rom_version);
-
-    //chk_nvram:	
-    if(rd_nvram_flag==0x55)
-    {
-        dev_info(&ts->client->dev, "NVRAM correct!\n");
-        goto chk_fw_version;
-    }
-    else if(rd_nvram_flag==0xAA)
-    {
-        dev_info(&ts->client->dev, "NVRAM incorrect!Need update.\n");
-        goto begin_upgrade;
-    }
-    else
-    {
-        dev_info(&ts->client->dev, "NVRAM other error![0x694]=0x%02x\n", rd_nvram_flag);
-        goto begin_upgrade;
-    }
-chk_fw_version:
-    //ts->version -= 1;               //test by andrew        
-    if( ts->version >= fw_version )   // current low byte higher than back-up low byte
-    {
-        dev_info(&ts->client->dev, "Fw verison not match.\n");
-        goto chk_mandatory_upgrade;
-    }
-    dev_info(&ts->client->dev,"Need to upgrade\n");
-    goto begin_upgrade;
-chk_mandatory_upgrade:
-    //ev_info(&ts->client->dev, "%s\n", mandatory_base);
-    //ev_info(&ts->client->dev, "%s\n", fw_info->mandatory_flag);
-    ret = memcmp(mandatory_base, fw_info->mandatory_flag, 6);
-    if(ret)
-    {
-        dev_info(&ts->client->dev,"Not meet mandatory upgrade,exit downloader!ret:%d\n", ret);
-        goto exit_downloader;
-    }
-    dev_info(&ts->client->dev, "Mandatory upgrade!\n");
-begin_upgrade:
-    dev_info(&ts->client->dev, "Begin upgrade!\n");
-    //goto exit_downloader;
-    dev_info(&ts->client->dev,"STEP_0:\n");
-    //gpio_free(INT_PORT);
-    //ret = gpio_request(INT_PORT, "TS_INT");	//Request IO
-    if (ret < 0) 
-    {
-        dev_info(&ts->client->dev,"Failed to request GPIO:%d, ERRNO:%d\n",(int)INT_PORT,ret);
-        err = -1;
-        goto exit_downloader;
-    }
-
-    dev_info(&ts->client->dev, "STEP_1:\n");
-    err = -1;
-    while( retry < 3 ) 
-    {
-        ret = gt811_update_proc( data_ptr,fw_start_addr, fw_length, ts);
-        if(ret == 1)
-        {
-            err = 1;
-            break;
-        }
-        retry++;
-    }
-
-exit_downloader:
-    //mt_set_gpio_mode(GPIO_CTP_EINT_PIN, GPIO_CTP_EINT_PIN_M_EINT);
-    //mt_set_gpio_out(GPIO_CTP_EN_PIN, GPIO_OUT_ONE);
-    //gpio_direction_output(INT_PORT,1);
-    //msleep(1);
-    //gpio_free(INT_PORT);
-    //s3c_gpio_setpull(INT_PORT, S3C_GPIO_PULL_NONE);
-    gpio_set_one_pin_pull(gpio_int_hdle, 0, "ctp_int_port");
-
-    return err;
-
-}
-#endif
-//******************************End of firmware update surpport*******************************
-/////////////////////////////// UPDATE STEP 4 END /////////////////////////////////////////////////////////////////
-
 //??????? ??????ID ??
 //only one client
 static const struct i2c_device_id goodix_ts_id[] = {
-	{ GOODIX_I2C_NAME, 0 },
+	{ "gt811" , 0 },
 	{ }
 };
 
@@ -2581,7 +1584,7 @@ static struct i2c_driver goodix_ts_driver = {
 #endif
 	.id_table	= goodix_ts_id,
 	.driver = {
-		.name	= GOODIX_I2C_NAME,
+		.name	= "gt811",
 		.owner = THIS_MODULE,
 	},
 	.address_list	= u_i2c_addr.normal_i2c,
@@ -2607,13 +1610,6 @@ static int __devinit goodix_ts_init(void)
 		
 	}
 
-	if (ctp_ops.fetch_sysconfig_para)
-	{
-		if(ctp_ops.fetch_sysconfig_para()){
-			printk("%s: err.\n", __func__);
-			return -1;
-		}
-	}
 	printk("%s: after fetch_sysconfig_para:  normal_i2c: 0x%hx. normal_i2c[1]: 0x%hx \n", \
 	__func__, u_i2c_addr.normal_i2c[0], u_i2c_addr.normal_i2c[1]);
 
