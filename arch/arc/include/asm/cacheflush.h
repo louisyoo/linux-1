@@ -52,6 +52,14 @@
  */
 #define flush_cache_page(vma, u_vaddr, pfn)
 
+/*
+ * Semantically we need this because icache doesn't snoop dcache/dma.
+ * However ARC Cache flush requires paddr as well as vaddr, latter not available
+ * in the flush_icache_page() API. So we no-op it but do the equivalent work
+ * in update_mmu_cache()
+ */
+#define flush_icache_page(vma, page)
+
 #ifdef CONFIG_ARC_CACHE
 
 extern void flush_cache_all(void);
@@ -67,16 +75,16 @@ extern void flush_icache_range_vaddr(unsigned long paddr, unsigned long u_vaddr,
 				     int len);
 extern void flush_icache_all(void);
 extern void flush_icache_range(unsigned long start, unsigned long end);
-extern void flush_icache_page(struct vm_area_struct *vma, struct page *page);
 
 #else
 
 #define flush_icache_all()			do { } while (0)
 #define flush_icache_range(start, end)		do { } while (0)
 #define flush_icache_range_vaddr(p, uv, len)	do { } while (0)
-#define flush_icache_page(vma, page)		do { } while (0)
 
 #endif /*CONFIG_ARC_HAS_ICACHE */
+
+void __inv_icache_page(unsigned long paddr, unsigned long vaddr);
 
 #define ARCH_IMPLEMENTS_FLUSH_DCACHE_PAGE 1
 

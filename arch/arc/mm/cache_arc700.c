@@ -760,17 +760,10 @@ void flush_icache_range_vaddr(unsigned long paddr, unsigned long u_vaddr,
 	__arc_dcache_flush_lines(paddr, len);
 }
 
-/*
- * This is called when a page-cache page is about to be mapped into a
- * user process' address space.  It offers an opportunity for a
- * port to ensure d-cache/i-cache coherency if necessary.
- */
-void flush_icache_page(struct vm_area_struct *vma, struct page *page)
+/* wrapper to compile time eliminate alignment checks in flush loop */
+void __inv_icache_page(unsigned long paddr, unsigned long vaddr)
 {
-	if (!(vma->vm_flags & VM_EXEC))
-		return;
-
-	__arc_icache_inv_lines((unsigned long)page_address(page), PAGE_SIZE);
+	__arc_icache_inv_lines_vaddr(paddr, vaddr, PAGE_SIZE);
 }
 
 void flush_icache_all()
