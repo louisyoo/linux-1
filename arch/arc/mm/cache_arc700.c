@@ -685,8 +685,8 @@ static void __arc_icache_inv_lines_vaddr(unsigned long phy_start,
  **********************************************************/
 
 /*
- * This is API for making I/D Caches consistent when modifying code
- * (loadable modules, kprobes,  etc)
+ * This is API for making I/D Caches consistent when modifying
+ * kernel code (loadable modules, kprobes, kgdb...)
  * This is called on insmod, with kernel virtual address for CODE of
  * the module. ARC cache maintenance ops require PHY address thus we
  * need to convert vmalloc addr to PHY addr
@@ -716,7 +716,13 @@ void flush_icache_range(unsigned long kstart, unsigned long kend)
 
 	/* Case: Kernel Phy addr (0x8000_0000 onwards) */
 	if (likely(kstart > PAGE_OFFSET)) {
-		__arc_icache_inv_lines(kstart, kend - kstart);
+		/*
+		 * The 2nd arg despite being paddr will be used to index icache
+		 * This is OK since no alternate virtual mappings will exist
+		 * given the callers for this case: kprobe/kgdb in built-in
+		 * kernel code only.
+		 */
+		__arc_icache_inv_lines_vaddr(kstart, kstart, kend - kstart);
 		__arc_dcache_flush_lines(kstart, kend - kstart);
 		return;
 	}
@@ -737,7 +743,7 @@ void flush_icache_range(unsigned long kstart, unsigned long kend)
 		sz = min_t(unsigned int, tot_sz, PAGE_SIZE - off);
 		local_irq_save(flags);
 		__arc_dcache_flush_lines(phy, sz);
-		__arc_icache_inv_lines(phy, sz);
+		__arc_icache_inv_lines_vaddr(phy, kstart, sz);
 		local_irq_restore(flags);
 		kstart += sz;
 		tot_sz -= sz;
