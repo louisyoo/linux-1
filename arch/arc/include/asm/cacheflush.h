@@ -71,8 +71,6 @@ extern void flush_cache_all(void);
 #endif /* CONFIG_ARC_CACHE */
 
 #ifdef CONFIG_ARC_HAS_ICACHE
-extern void flush_icache_range_vaddr(unsigned long paddr, unsigned long u_vaddr,
-				     int len);
 extern void flush_icache_all(void);
 extern void flush_icache_range(unsigned long start, unsigned long end);
 
@@ -80,11 +78,11 @@ extern void flush_icache_range(unsigned long start, unsigned long end);
 
 #define flush_icache_all()			do { } while (0)
 #define flush_icache_range(start, end)		do { } while (0)
-#define flush_icache_range_vaddr(p, uv, len)	do { } while (0)
 
 #endif /*CONFIG_ARC_HAS_ICACHE */
 
 void __inv_icache_page(unsigned long paddr, unsigned long vaddr);
+void __sync_icache_dcache(unsigned long paddr, unsigned long vaddr, int len);
 
 #define ARCH_IMPLEMENTS_FLUSH_DCACHE_PAGE 1
 
@@ -128,7 +126,7 @@ void flush_and_inv_dcache_all(void);
 do {									\
 	memcpy(dst, src, len);						\
 	if (vma->vm_flags & VM_EXEC)					\
-	    flush_icache_range_vaddr((unsigned long)(dst), vaddr, len);	\
+	    __sync_icache_dcache((unsigned long)(dst), vaddr, len);	\
 } while (0)
 
 #define copy_from_user_page(vma, page, vaddr, dst, src, len)		\
