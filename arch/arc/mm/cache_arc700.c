@@ -400,7 +400,8 @@ EXPORT_SYMBOL(flush_dcache_range);
 
 void flush_dcache_page(struct page *page)
 {
-	__arc_dcache_flush_lines((unsigned long)page_address(page), PAGE_SIZE);
+	/* Make a note that dcache is not yet flushed for this page */
+	set_bit(PG_arch_1, &page->flags);
 }
 EXPORT_SYMBOL(flush_dcache_page);
 
@@ -594,6 +595,11 @@ void __sync_icache_dcache(unsigned long paddr, unsigned long vaddr, int len)
 void __inv_icache_page(unsigned long paddr, unsigned long vaddr)
 {
 	__arc_icache_inv_lines_vaddr(paddr, vaddr, PAGE_SIZE);
+}
+
+void __flush_dcache_page(unsigned long paddr)
+{
+	__arc_dcache_inv_lines(paddr, PAGE_SIZE, 1);
 }
 
 void flush_icache_all()
