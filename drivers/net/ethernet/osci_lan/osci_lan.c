@@ -33,7 +33,7 @@
 #include <linux/of.h>
 #include "osci_lan.h"
 
-struct sockaddr mac_addr = { 0, {0x84, 0x66, 0x46, 0x88, 0x63, 0x33} };
+static struct sockaddr mac_addr = { 0, {0x84, 0x66, 0x46, 0x88, 0x63, 0x33} };
 
 static int osci_lan_set_mac_address(struct net_device *netdev, void *p)
 {
