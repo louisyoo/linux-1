@@ -83,7 +83,7 @@ extern void flush_icache_range(unsigned long start, unsigned long end);
 
 void __inv_icache_page(unsigned long paddr, unsigned long vaddr);
 void __sync_icache_dcache(unsigned long paddr, unsigned long vaddr, int len);
-void __flush_dcache_page(unsigned long paddr);
+void __flush_dcache_page(unsigned long paddr, unsigned long vaddr);
 
 #define ARCH_IMPLEMENTS_FLUSH_DCACHE_PAGE 1
 
@@ -98,10 +98,10 @@ extern void flush_and_inv_dcache_range(unsigned long start, unsigned long end);
 extern void inv_dcache_range(unsigned long start, unsigned long end);
 void flush_and_inv_dcache_all(void);
 
-#define dma_cache_wback_inv(start, sz) flush_and_inv_dcache_range(start,  \
-								  start + sz)
-#define dma_cache_wback(start, sz)     flush_dcache_range(start, start + sz)
-#define dma_cache_inv(start, sz)       inv_dcache_range(start, start + sz)
+#define dma_cache_wback_inv(start, sz) flush_and_inv_dcache_range(start, \
+								start + sz)
+#define dma_cache_wback(start, sz)	flush_dcache_range(start, start + sz)
+#define dma_cache_inv(start, sz)	inv_dcache_range(start, start + sz)
 
 #else
 

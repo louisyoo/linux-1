@@ -284,8 +284,9 @@ static inline void __arc_dcache_entire_op(const int aux_reg, const int cacheop)
  * Doesn't deal with type-of-op/IRQ-disabling/waiting-for-flush-to-complete
  * It's sole purpose is to help gcc generate ZOL
  */
-static inline void __arc_dcache_per_line_op(unsigned long paddr,
-					    unsigned long sz, int aux_reg)
+static inline void
+__arc_dcache_per_line_op(unsigned long paddr, unsigned long vaddr,
+			 unsigned long sz, int aux_reg)
 {
 	int num_lines;
 
@@ -298,22 +299,29 @@ static inline void __arc_dcache_per_line_op(unsigned long paddr,
 	if (!(__builtin_constant_p(sz) && sz == PAGE_SIZE)) {
 		sz += paddr & ~DCACHE_LINE_MASK;
 		paddr &= DCACHE_LINE_MASK;
+		vaddr &= DCACHE_LINE_MASK;
 	}
 
 	num_lines = DIV_ROUND_UP(sz, ARC_DCACHE_LINE_LEN);
+
+#if (CONFIG_ARC_MMU_VER <= 2)
+	paddr |= (vaddr >> PAGE_SHIFT) & 0x1F;
+#endif
 
 	while (num_lines-- > 0) {
 #if (CONFIG_ARC_MMU_VER > 2)
 		/*
 		 * Just as for I$, in MMU v3, D$ ops also require
 		 * "tag" bits in DC_PTAG, "index" bits in FLDL,IVDL ops
-		 * But we pass phy addr for both. This works since Linux
-		 * doesn't support aliasing configs for D$, yet.
-		 * Thus paddr is enough to provide both tag and index.
 		 */
 		write_aux_reg(ARC_REG_DC_PTAG, paddr);
-#endif
+
+		write_aux_reg(aux_reg, vaddr);
+		vaddr += ARC_DCACHE_LINE_LEN;
+#else
+		/* paddr contains stuffed vaddrs bits */
 		write_aux_reg(aux_reg, paddr);
+#endif
 		paddr += ARC_DCACHE_LINE_LEN;
 	}
 }
@@ -321,14 +329,15 @@ static inline void __arc_dcache_per_line_op(unsigned long paddr,
 /*
  * D-Cache : Per Line FLUSH (wback)
  */
-static inline void __arc_dcache_flush_lines(unsigned long paddr,
-					    unsigned long sz)
+static inline void
+	__arc_dcache_flush_lines(unsigned long paddr, unsigned long vaddr,
+				 unsigned long sz)
 {
 	unsigned long flags;
 
 	local_irq_save(flags);
 
-	__arc_dcache_per_line_op(paddr, sz, ARC_REG_DC_FLDL);
+	__arc_dcache_per_line_op(paddr, vaddr, sz, ARC_REG_DC_FLDL);
 
 	wait_for_flush();
 
@@ -338,8 +347,9 @@ static inline void __arc_dcache_flush_lines(unsigned long paddr,
 /*
  * D-Cache : Per Line INV (discard or wback+discard)
  */
-static inline void __arc_dcache_inv_lines(unsigned long paddr, unsigned long sz,
-					  int flush_n_inv)
+static inline void
+__arc_dcache_inv_lines(unsigned long paddr, unsigned long vaddr,
+		       unsigned long sz, int flush_n_inv)
 {
 	unsigned long flags, orig_d_ctrl = orig_d_ctrl;
 
@@ -356,7 +366,7 @@ static inline void __arc_dcache_inv_lines(unsigned long paddr, unsigned long sz,
 				  orig_d_ctrl | DC_CTRL_INV_MODE_FLUSH);
 	}
 
-	__arc_dcache_per_line_op(paddr, sz, ARC_REG_DC_IVDL);
+	__arc_dcache_per_line_op(paddr, vaddr, sz, ARC_REG_DC_IVDL);
 
 	if (flush_n_inv) {
 		wait_for_flush();
@@ -393,7 +403,7 @@ EXPORT_SYMBOL(flush_dcache_all);
 
 void flush_dcache_range(unsigned long start, unsigned long end)
 {
-	__arc_dcache_flush_lines(start, end - start);
+	__arc_dcache_flush_lines(start, start, end - start);
 }
 EXPORT_SYMBOL(flush_dcache_range);
 
@@ -406,18 +416,18 @@ EXPORT_SYMBOL(flush_dcache_page);
 
 void flush_and_inv_dcache_range(unsigned long start, unsigned long end)
 {
-	__arc_dcache_inv_lines(start, end - start, 1);
+	__arc_dcache_inv_lines(start, start, end - start, 1);
 }
 EXPORT_SYMBOL(flush_and_inv_dcache_all);
 
 void inv_dcache_range(unsigned long start, unsigned long end)
 {
-	__arc_dcache_inv_lines(start, end - start, 0);
+	__arc_dcache_inv_lines(start, start, end - start, 0);
 }
 EXPORT_SYMBOL(inv_dcache_range);
 
 #else
-#define __arc_dcache_flush_lines(a, b)
+#define __arc_dcache_flush_lines(a, b, c)
 #define __arc_dcache_inv_lines(a, b, c)
 #endif
 
@@ -583,7 +593,7 @@ void flush_icache_range(unsigned long kstart, unsigned long kend)
 void __sync_icache_dcache(unsigned long paddr, unsigned long vaddr, int len)
 {
 	__arc_icache_inv_lines_vaddr(paddr, vaddr, len);
-	__arc_dcache_flush_lines(paddr, len);
+	__arc_dcache_flush_lines(paddr, vaddr, len);
 }
 
 /* wrapper to compile time eliminate alignment checks in flush loop */
@@ -592,9 +602,9 @@ void __inv_icache_page(unsigned long paddr, unsigned long vaddr)
 	__arc_icache_inv_lines_vaddr(paddr, vaddr, PAGE_SIZE);
 }
 
-void __flush_dcache_page(unsigned long paddr)
+void __flush_dcache_page(unsigned long paddr, unsigned long vaddr)
 {
-	__arc_dcache_inv_lines(paddr, PAGE_SIZE, 1);
+	__arc_dcache_inv_lines(paddr, vaddr, PAGE_SIZE, 1);
 }
 
 void flush_icache_all()
@@ -628,61 +638,6 @@ noinline void flush_cache_all()
 #define __arc_icache_inv_lines_vaddr(a, b, c)
 #endif
 
-/* Helper functions for sys_cacheflush */
-
-#ifdef CONFIG_ARC_CACHE
-
-static void __arc_cf_all(uint32_t flags)
-{
-	unsigned long irq_flags;
-
-	local_irq_save(irq_flags);
-
-	switch (flags & CF_D_FLUSH_INV) {
-	case CF_D_FLUSH:
-		flush_dcache_all();
-		break;
-	case CF_D_INV:
-		inv_dcache_all();
-		break;
-	case CF_D_FLUSH_INV:
-		flush_and_inv_dcache_all();
-		break;
-	}
-
-	if (flags & CF_I_INV)
-		flush_icache_all();
-
-	local_irq_restore(irq_flags);
-}
-
-static void __arc_cf_lines(uint32_t phy, uint32_t sz, uint32_t flags)
-{
-	unsigned long irq_flags;
-
-	local_irq_save(irq_flags);
-
-	switch (flags & CF_D_FLUSH_INV) {
-	case CF_D_FLUSH:
-		__arc_dcache_flush_lines(phy, sz);
-		break;
-	case CF_D_INV:
-		__arc_dcache_inv_lines(phy, sz, 0);
-		break;
-	case CF_D_FLUSH_INV:
-		__arc_dcache_inv_lines(phy, sz, 1);
-		break;
-	default:
-		break;
-	}
-
-	if (flags & CF_I_INV)
-		__arc_icache_inv_lines(phy, sz);
-
-	local_irq_restore(irq_flags);
-}
-#endif
-
 /*
  * Explicit Cache flush request from user space via syscall
  * Needed for JITs which generate code on the fly
@@ -692,68 +647,7 @@ static void __arc_cf_lines(uint32_t phy, uint32_t sz, uint32_t flags)
 SYSCALL_DEFINE3(cacheflush, uint32_t, start, uint32_t, sz, uint32_t, flags)
 {
 #ifdef CONFIG_ARC_CACHE
-	struct vm_area_struct *vma;
-	uint32_t end = start + sz;
-
-	if (!flags)
-		flags = CF_DEFAULT;
-
-	/* make sure that the address is valid, in case of virtual address */
-	if ((!(flags & CF_PHY_ADDR)) && access_ok(VERIFY_READ, start, sz))
-		return -EFAULT;
-
-	/* optimization for large areas: flush/inv entire D$ instead */
-	if (sz > PAGE_SIZE) {
-		__arc_cf_all(flags);
-		return 0;
-	}
-
-	if (flags & CF_PHY_ADDR) {
-		__arc_cf_lines(start, sz, flags);
-		return 0;
-	}
-
-	vma = find_vma(current->mm, start);
-	while ((vma) && (vma->vm_start < end)) {
-		uint32_t lstart, lend, laddr;
-		lstart = (vma->vm_start < start) ? start : vma->vm_start;
-		lend = (vma->vm_end > end) ? end : vma->vm_end;
-		lstart &= PAGE_MASK;
-
-		for (laddr = lstart; laddr <= lend; laddr += PAGE_SIZE) {
-			uint32_t pfn, lsz, phy;
-			pte_t *page_table, pte;
-
-			pgd_t *pgd = pgd_offset(current->mm, laddr);
-			pud_t *pud = pud_offset(pgd, laddr);
-			pmd_t *pmd = pmd_offset(pud, laddr);
-
-			/*
-			 * FIXME: some times these values are 0, not sure why,
-			 * but at least this prevents a crash
-			 */
-			if (!pmd)
-				return -EINVAL;
-
-			page_table = pte_offset_kernel(pmd, laddr);
-			if (!page_table)
-				return -EINVAL;
-
-			pte = *page_table;
-			pfn = pte_pfn(pte);
-			phy = pfn << PAGE_SHIFT;
-			lsz = (lend < (laddr + PAGE_SIZE)) ?
-			    (lend - laddr) : PAGE_SIZE;
-			if (start > laddr) {
-				phy += start - laddr;
-				lsz -= start - laddr;
-			}
-			__arc_cf_lines(phy, lsz, flags);
-		}
-		start = vma->vm_end;
-		vma = find_vma(current->mm, start);
-	}
-
+	flush_cache_all();
 	return 0;
 #else
 	return -EINVAL;
