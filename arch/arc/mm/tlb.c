@@ -139,9 +139,6 @@ int asid_cache = FIRST_ASID;
  */
 struct mm_struct *asid_mm_map[NUM_ASID + 1];
 
-/* Needed to avoid Cache aliasing */
-unsigned int ARC_shmlba;
-
 /*=========================================================================
  * ARC700 MMU has 256 J-TLB  entries organised as 128 SETs with 2 WAYs each.
  * For TLB Operations, Linux uses "HW" Index to write entry into a particular

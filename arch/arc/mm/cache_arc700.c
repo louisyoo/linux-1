@@ -160,8 +160,6 @@ void __init arc_cache_init(void)
 
 	printk(arc_cache_mumbojumbo(0, str, sizeof(str)));
 
-	ARC_shmlba = max_t(unsigned int, ARC_shmlba, PAGE_SIZE);
-
 #ifdef CONFIG_ARC_HAS_ICACHE
 	ic = &cpuinfo_arc700[cpu].icache;
 

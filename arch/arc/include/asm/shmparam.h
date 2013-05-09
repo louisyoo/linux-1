@@ -8,12 +8,11 @@
 
 #ifndef _ASM_ARC_SHMPARAM_H
 #define _ASM_ARC_SHMPARAM_H
-#include <asm/cache.h>
-/*
- * This should be the size of the virtually indexed cache/ways,
- * or page size, whichever is greater since the cache aliases
- * every size/ways bytes.
- */
-#define SHMLBA ARC_shmlba
+
+/* Handle upto 2 cache bins */
+#define	SHMLBA	(2 * PAGE_SIZE)
+
+/* Enforce SHMLBA in shmat */
+#define __ARCH_FORCE_SHMLBA
 
 #endif /* _ASM_ARC_SHMPARAM_H */

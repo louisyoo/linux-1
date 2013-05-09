@@ -280,6 +280,11 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long address,
 
 #include <asm-generic/pgtable.h>
 
+#ifdef CONFIG_ARC_CACHE_VIPT_ALIASING
+/* to cope with aliasing VIPT cache */
+#define HAVE_ARCH_UNMAPPED_AREA
+#endif
+
 /*
  * remap a physical page `pfn' of size `size' with page protection `prot'
  * into virtual address `from'
