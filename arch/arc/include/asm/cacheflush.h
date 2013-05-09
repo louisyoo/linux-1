@@ -24,33 +24,32 @@
 #define flush_cache_vmap(start, end)		flush_cache_all()
 #define flush_cache_vunmap(start, end)		flush_cache_all()
 
-/* NOPS for VIPT Cache with non-aliasing D$ configurations only */
-
 /* called during fork */
 #define flush_cache_dup_mm(mm)
 
-/* called during execve/exit */
+#ifndef CONFIG_ARC_CACHE_VIPT_ALIASING
+/* NOPS for VIPT Cache with non-aliasing D$ configurations only */
 #define flush_cache_mm(mm)
-
-/* flush_cache_range( ): Flush the Cache lines for @u_vstart .. @u_vend
- * 1) Called when a range of user-space V-P mappings are torn-down:
- *     because of munmap() or exit().
- * 2) For VIPT, Non-aliasing D-Cache, flush_cache_range() can be a NOP.
- *    For now, ARC Linux doesn't support such ARC700 hardware configs, hence
- *    it can safely be a NOP
- *    If and when we do, this would have to be properly implemented
- *      -ASID doesn't have any role to play here
- *      -don't flush the entire I/D$, but iterate thru mappings, and
- *        for v-pages with backing phy-frame, flush the page from cache.
- *
- */
 #define flush_cache_range(mm, u_vstart, u_vend)
-
-/* flush_cache_page( ): Flush Cache-lines for @u_vaddr mapped to @pfn
- * Cousin of flush_cache_range( ) called mainly during page fault handling
- * COW etc. Again per above, for now it can be a NOP.
- */
 #define flush_cache_page(vma, u_vaddr, pfn)
+#else
+
+/* To clear out stale userspace mappings */
+void flush_cache_mm(struct mm_struct *mm);
+void flush_cache_range(struct vm_area_struct *vma,
+	unsigned long start,unsigned long end);
+void flush_cache_page(struct vm_area_struct *vma,
+	unsigned long user_addr, unsigned long page);
+
+/*
+ * To make sure that userspace mapping is flushed to memory before
+ * get_user_pages() uses a kernel mapping to access the page
+ */
+#define ARCH_HAS_FLUSH_ANON_PAGE
+void flush_anon_page(struct vm_area_struct *vma,
+	struct page *page, unsigned long u_vaddr);
+
+#endif
 
 /*
  * Semantically we need this because icache doesn't snoop dcache/dma.
@@ -117,6 +116,29 @@ void flush_and_inv_dcache_all(void);
 #define dma_cache_wback(start, size)		do { } while (0)
 #define dma_cache_inv(start, size)		do { } while (0)
 #endif /*CONFIG_ARC_HAS_DCACHE */
+
+/*
+ * Simple wrapper over config option
+ * Bootup code ensures that hardware matches kernel configuration
+ */
+static inline int cache_is_vipt_aliasing(void)
+{
+#ifdef CONFIG_ARC_CACHE_VIPT_ALIASING
+	return 1;
+#else
+	return 0;
+#endif
+}
+
+#define CACHE_COLOR(addr)	(((unsigned long)(addr) >> (PAGE_SHIFT)) & 3)
+
+/*
+ * checks if two addresses (after page aligning) index into same cache set
+ */
+#define addr_not_cache_congruent(addr1, addr2)				\
+	cache_is_vipt_aliasing() ? 					\
+		(CACHE_COLOR(addr1) != CACHE_COLOR(addr2)) : 0		\
+
 
 /*
  * Copy user data from/to a page which is mapped into a different

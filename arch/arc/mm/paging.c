@@ -74,14 +74,3 @@ void pgd_init(unsigned long page)
 	memzero((void *)page, USER_PTRS_PER_PGD * 4);
 }
 #endif
-
-void clear_user_page(void *addr, unsigned long vaddr, struct page *page)
-{
-	clear_page(addr);
-}
-
-void copy_user_page(void *vto, void *vfrom, unsigned long vaddr,
-		    struct page *to)
-{
-	copy_page(vto, vfrom);
-}
