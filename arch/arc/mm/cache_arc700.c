@@ -284,21 +284,20 @@ static inline void __arc_dcache_entire_op(const int aux_reg, const int cacheop)
  * Doesn't deal with type-of-op/IRQ-disabling/waiting-for-flush-to-complete
  * It's sole purpose is to help gcc generate ZOL
  */
-static inline void __arc_dcache_per_line_op(unsigned long start,
+static inline void __arc_dcache_per_line_op(unsigned long paddr,
 					    unsigned long sz, int aux_reg)
 {
-	int num_lines, slack;
+	int num_lines;
 
 	/* Ensure we properly floor/ceil the non-line aligned/sized requests
-	 * and have @start - aligned to cache line and integral @num_lines
+	 * and have @paddr - aligned to cache line and integral @num_lines
 	 * However page sized flushes can be compile time optimised.
-	 *  -@start will be cache-line aligned already (being page aligned)
+	 *  -@paddr will be cache-line aligned already (being page aligned)
 	 *  -@sz will be integral multiple of line size (being page sized).
 	 */
 	if (!(__builtin_constant_p(sz) && sz == PAGE_SIZE)) {
-		slack = start & ~DCACHE_LINE_MASK;
-		sz += slack;
-		start -= slack;
+		sz += paddr & ~DCACHE_LINE_MASK;
+		paddr &= DCACHE_LINE_MASK;
 	}
 
 	num_lines = DIV_ROUND_UP(sz, ARC_DCACHE_LINE_LEN);
@@ -312,24 +311,24 @@ static inline void __arc_dcache_per_line_op(unsigned long start,
 		 * doesn't support aliasing configs for D$, yet.
 		 * Thus paddr is enough to provide both tag and index.
 		 */
-		write_aux_reg(ARC_REG_DC_PTAG, start);
+		write_aux_reg(ARC_REG_DC_PTAG, paddr);
 #endif
-		write_aux_reg(aux_reg, start);
-		start += ARC_DCACHE_LINE_LEN;
+		write_aux_reg(aux_reg, paddr);
+		paddr += ARC_DCACHE_LINE_LEN;
 	}
 }
 
 /*
  * D-Cache : Per Line FLUSH (wback)
  */
-static inline void __arc_dcache_flush_lines(unsigned long start,
+static inline void __arc_dcache_flush_lines(unsigned long paddr,
 					    unsigned long sz)
 {
 	unsigned long flags;
 
 	local_irq_save(flags);
 
-	__arc_dcache_per_line_op(start, sz, ARC_REG_DC_FLDL);
+	__arc_dcache_per_line_op(paddr, sz, ARC_REG_DC_FLDL);
 
 	wait_for_flush();
 
@@ -339,7 +338,7 @@ static inline void __arc_dcache_flush_lines(unsigned long start,
 /*
  * D-Cache : Per Line INV (discard or wback+discard)
  */
-static inline void __arc_dcache_inv_lines(unsigned long start, unsigned long sz,
+static inline void __arc_dcache_inv_lines(unsigned long paddr, unsigned long sz,
 					  int flush_n_inv)
 {
 	unsigned long flags, orig_d_ctrl = orig_d_ctrl;
@@ -357,7 +356,7 @@ static inline void __arc_dcache_inv_lines(unsigned long start, unsigned long sz,
 				  orig_d_ctrl | DC_CTRL_INV_MODE_FLUSH);
 	}
 
-	__arc_dcache_per_line_op(start, sz, ARC_REG_DC_IVDL);
+	__arc_dcache_per_line_op(paddr, sz, ARC_REG_DC_IVDL);
 
 	if (flush_n_inv) {
 		wait_for_flush();
@@ -462,49 +461,45 @@ EXPORT_SYMBOL(inv_dcache_range);
 /*
  * Machine specific helper for per line I-Cache invalidate.
  */
-static void __arc_icache_inv_lines_vaddr(unsigned long phy_start,
+static void __arc_icache_inv_lines_vaddr(unsigned long paddr,
 					 unsigned long vaddr, unsigned long sz)
 {
 	unsigned long flags;
-	int num_lines, slack;
-	unsigned int addr;
+	int num_lines;
 
 	/*
 	 * Ensure we properly floor/ceil the non-line aligned/sized requests:
 	 * However page sized flushes can be compile time optimised.
-	 *  -@phy_start will be cache-line aligned already (being page aligned)
+	 *  -@paddr will be cache-line aligned already (being page aligned)
 	 *  -@sz will be integral multiple of line size (being page sized).
 	 */
 	if (!(__builtin_constant_p(sz) && sz == PAGE_SIZE)) {
-		slack = phy_start & ~ICACHE_LINE_MASK;
-		sz += slack;
-		phy_start -= slack;
+		sz += paddr & ~ICACHE_LINE_MASK;
+		paddr &= ICACHE_LINE_MASK;
+		vaddr &= ICACHE_LINE_MASK;
 	}
 
 	num_lines = DIV_ROUND_UP(sz, ARC_ICACHE_LINE_LEN);
 
-#if (CONFIG_ARC_MMU_VER > 2)
-	vaddr &= ICACHE_LINE_MASK;
-	addr = phy_start;
-#else
+#if (CONFIG_ARC_MMU_VER <= 2)
 	/* bits 17:13 of vaddr go as bits 4:0 of paddr */
-	addr = phy_start | ((vaddr >> 13) & 0x1F);
+	paddr |= (vaddr >> PAGE_SHIFT) & 0x1F;
 #endif
 
 	local_irq_save(flags);
 	while (num_lines-- > 0) {
 #if (CONFIG_ARC_MMU_VER > 2)
 		/* tag comes from phy addr */
-		write_aux_reg(ARC_REG_IC_PTAG, addr);
+		write_aux_reg(ARC_REG_IC_PTAG, paddr);
 
 		/* index bits come from vaddr */
 		write_aux_reg(ARC_REG_IC_IVIL, vaddr);
 		vaddr += ARC_ICACHE_LINE_LEN;
 #else
 		/* paddr contains stuffed vaddrs bits */
-		write_aux_reg(ARC_REG_IC_IVIL, addr);
+		write_aux_reg(ARC_REG_IC_IVIL, paddr);
 #endif
-		addr += ARC_ICACHE_LINE_LEN;
+		paddr += ARC_ICACHE_LINE_LEN;
 	}
 	local_irq_restore(flags);
 }
