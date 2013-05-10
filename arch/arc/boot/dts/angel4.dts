@@ -51,5 +51,9 @@
 			current-speed = <115200>;
 			status = "okay";
 		};
+
+		arcpmu0: pmu {
+			compatible = "snps,arc_pmu";
+		};
 	};
 };
