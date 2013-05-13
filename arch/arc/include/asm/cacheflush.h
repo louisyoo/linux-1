@@ -143,6 +143,12 @@ static inline int cache_is_vipt_aliasing(void)
 	cache_is_vipt_aliasing() ? 					\
 		(CACHE_COLOR(addr1) != CACHE_COLOR(addr2)) : 0		\
 
+ /*
+ * A new pagecache page has PG_arch_1 clear - thus dcache dirty by default
+ * This works around some PIO based drivers which don't call flush_dcache_page
+ * to record that they dirtied the dcache
+ */
+#define PG_dc_clean	PG_arch_1
 
 /*
  * Copy user data from/to a page which is mapped into a different
