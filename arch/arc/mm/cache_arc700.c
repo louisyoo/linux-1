@@ -631,7 +631,7 @@ void flush_icache_range(unsigned long kstart, unsigned long kend)
 void __sync_icache_dcache(unsigned long paddr, unsigned long vaddr, int len)
 {
 	__arc_icache_inv_lines_vaddr(paddr, vaddr, len);
-	__arc_dcache_flush_lines(paddr, vaddr, len);
+	__arc_dcache_inv_lines(paddr, vaddr, len, 1);
 }
 
 /* wrapper to compile time eliminate alignment checks in flush loop */
