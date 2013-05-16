@@ -642,7 +642,7 @@ void __inv_icache_page(unsigned long paddr, unsigned long vaddr)
 
 void ___flush_dcache_page(unsigned long paddr, unsigned long vaddr)
 {
-	__arc_dcache_inv_lines(paddr, vaddr, PAGE_SIZE, 1);
+	__arc_dcache_inv_lines(paddr, vaddr & PAGE_MASK, PAGE_SIZE, 1);
 }
 
 void flush_icache_all()
