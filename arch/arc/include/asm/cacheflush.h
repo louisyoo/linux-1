@@ -140,8 +140,10 @@ static inline int cache_is_vipt_aliasing(void)
  * checks if two addresses (after page aligning) index into same cache set
  */
 #define addr_not_cache_congruent(addr1, addr2)				\
+({									\
 	cache_is_vipt_aliasing() ? 					\
-		(CACHE_COLOR(addr1) != CACHE_COLOR(addr2)) : 0		\
+		(CACHE_COLOR(addr1) != CACHE_COLOR(addr2)) : 0	;	\
+})
 
  /*
  * A new pagecache page has PG_arch_1 clear - thus dcache dirty by default
