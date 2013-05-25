@@ -46,17 +46,11 @@ struct page;
 #define clear_page(paddr)  memset((unsigned int *)(paddr), 0, PAGE_SIZE)
 extern void copy_page(void *to, void *from);
 
-#ifndef CONFIG_ARC_CACHE_VIPT_ALIASING
-
-#define clear_user_page(addr, vaddr, pg)	clear_page(addr)
-#define copy_user_page(vto, vfrom, vaddr, pg)	copy_page(vto, vfrom)
-#else
 #define __HAVE_ARCH_COPY_USER_HIGHPAGE
 
 void copy_user_highpage(struct page *to, struct page *from,
 			unsigned long u_vaddr, struct vm_area_struct *vma);
 void clear_user_page(void *to, unsigned long u_vaddr, struct page *page);
-#endif
 
 #define get_user_page(vaddr)        __get_free_page(GFP_KERNEL)
 #define free_user_page(page, addr)  free_page(addr)
